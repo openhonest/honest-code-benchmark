@@ -1,0 +1,113 @@
+<div id="browser-content"
+     data-sort-col="{{ sort_col }}"
+     data-sort-dir="{{ sort_dir }}"
+     data-search="{{ search }}"
+     data-status-filter="{{ status_filter }}"
+     data-page="{{ page }}"
+     data-selected-id="{{ selected_id }}"
+     data-detail-open="{{ 'true' if selected_record else 'false' }}">
+
+  <input type="hidden" name="sortCol" value="{{ sort_col }}">
+  <input type="hidden" name="sortDir" value="{{ sort_dir }}">
+  <input type="hidden" name="search" value="{{ search }}">
+  <input type="hidden" name="statusFilter" value="{{ status_filter }}">
+  <input type="hidden" name="page" value="{{ page }}">
+  <input type="hidden" name="selectedId" value="{{ selected_id }}">
+
+  <div class="filter-bar">
+    <input type="text"
+           name="searchInput"
+           placeholder="Search by name..."
+           value="{{ search }}"
+           data-role="search-input"
+           hx-get="{{ base_path }}/search"
+           hx-trigger="keyup changed delay:300ms"
+           hx-target="#browser-content"
+           hx-swap="outerHTML"
+           hx-include="#browser-content input[type=hidden]">
+  </div>
+
+  <div class="toolbar">
+    <button class="{{ 'active' if status_filter == 'all' else '' }}"
+            data-role="status-filter"
+            data-status="all"
+            hx-get="{{ base_path }}/status-filter?status=all"
+            hx-target="#browser-content"
+            hx-swap="outerHTML"
+            hx-include="#browser-content input[type=hidden]">All</button>
+    {% for s in statuses %}
+    <button class="{{ 'active' if status_filter == s else '' }}"
+            data-role="status-filter"
+            data-status="{{ s }}"
+            hx-get="{{ base_path }}/status-filter?status={{ s }}"
+            hx-target="#browser-content"
+            hx-swap="outerHTML"
+            hx-include="#browser-content input[type=hidden]">{{ s[0]|upper }}{{ s[1:] }}</button>
+    {% endfor %}
+    <span style="margin-left:auto">{{ total_rows }} records</span>
+  </div>
+
+  <div style="display:flex;gap:1rem">
+    <div style="flex:1">
+      <table>
+        <thead>
+          <tr>
+            {% for col in columns %}
+            <th data-column="{{ col.key }}"
+                hx-get="{{ base_path }}/sort?col={{ col.key }}"
+                hx-target="#browser-content"
+                hx-swap="outerHTML"
+                hx-include="#browser-content input[type=hidden]"
+                style="cursor:pointer">
+              {{ col.label }}
+              <span class="sort-indicator{{ ' active' if sort_col == col.key else '' }}">
+                {% if sort_col != col.key %}&#8597;{% elif sort_dir == 'asc' %}&#8593;{% else %}&#8595;{% endif %}
+              </span>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr data-row="{{ row.id }}"
+              class="{{ 'selected' if selected_id|string == row.id|string else '' }}"
+              style="cursor:pointer"
+              hx-get="{{ base_path }}/select?id={{ row.id }}"
+              hx-target="#browser-content"
+              hx-swap="outerHTML"
+              hx-include="#browser-content input[type=hidden]">
+            <td data-column="name">{{ row.name }}</td>
+            <td data-column="status"><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
+            <td data-column="createdDate">
+              <span fx-format="date" fx-raw="{{ row.createdDate }}" fx-cloak>{{ row.createdDate }}</span>
+            </td>
+            <td data-column="value">
+              <span fx-format="currency" fx-raw="{{ row.value }}" fx-currency="USD" fx-cloak>{{ row.value }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="pagination">
+        <button data-action="prev-page"
+                {{ 'disabled' if page <= 1 else '' }}
+                hx-get="{{ base_path }}/page?p={{ page - 1 }}"
+                hx-target="#browser-content"
+                hx-swap="outerHTML"
+                hx-include="#browser-content input[type=hidden]">Previous</button>
+        <span class="page-info" data-role="page-info">Page {{ page }} of {{ total_pages }}</span>
+        <button data-action="next-page"
+                {{ 'disabled' if page >= total_pages else '' }}
+                hx-get="{{ base_path }}/page?p={{ page + 1 }}"
+                hx-target="#browser-content"
+                hx-swap="outerHTML"
+                hx-include="#browser-content input[type=hidden]">Next</button>
+      </div>
+    </div>
+
+    {% if selected_record %}
+    {% include '_detail.html' %}
+    {% endif %}
+  </div>
+</div>

@@ -1,0 +1,74 @@
+module browser_ssr_honest
+  layer application
+  note "server-rendered record browser with search, status filter, sort, pagination and detail panel"
+
+  inputs  = { "request" : "HTTP request", "datafile" : "JSON record data on disk" }
+  outputs = { "response" : "HTML page with embedded data for hydration" }
+
+  type Record = { id: int
+                  name: str
+                  status: Status
+                  createdDate: str
+                  value: int }
+
+  type ViewState = { search: str
+                     statusFilter: Status | Absent
+                     sortCol: ColumnKey | Absent
+                     sortDir: SortDir | Absent
+                     currentPage: int
+                     selectedId: int | Absent }
+
+  type PageResult = { pageRows: list<Record>
+                      totalPages: int
+                      totalFiltered: int }
+
+  type Fault = { reason: str
+                 remedy: str }
+
+  set statuses = { "active", "inactive", "pending", "archived", "flagged" }
+  vocabulary Status = { statuses }
+
+  set columns = { "name", "status", "createdDate", "value" }
+  vocabulary ColumnKey = { columns }
+
+  set sort_directions = { "asc", "desc" }
+  vocabulary SortDir = { sort_directions }
+
+  dispatch sort_comparators = { "string" -> compare_string,
+                                "number" -> compare_number }
+
+  boundary_in fn handle_request : (archetype: str, arm: str, rows: int) -> str | Fault
+    note "parse the HTTP request and extract archetype, arm and row count"
+    side_effect reads "request"
+
+  reader fn load_data : (path: str) -> list<Record>
+    note "read the JSON data file from disk"
+    side_effect reads "datafile"
+
+  boundary_out fn send_page : (html: str, renderMs: float) -> str
+    note "send the rendered HTML page with timing headers"
+    side_effect writes "response"
+
+  chain serve = handle_request -> build_page -> send_page
+
+  orchestrator fn build_page : (archetype: str, arm: str, rows: int) -> str
+    note "load data, search, filter, sort, paginate and render the full HTML page"
+    invokes load_data, filter_by_search, filter_by_status, sort_rows, paginate, format_value, find_record
+
+  fn filter_by_search : (rows: list<Record>, text: str) -> list<Record>
+    note "keep rows whose name contains the text as a case-insensitive substring"
+  fn filter_by_status : (rows: list<Record>, status: Status | Absent) -> list<Record>
+    note "keep rows matching the given status or return all when status is all"
+  fn sort_rows : (rows: list<Record>, col: ColumnKey, dir: SortDir) -> list<Record>
+    note "sort rows by the given column using the dispatch table"
+    invokes sort_comparators
+  fn paginate : (rows: list<Record>, page: int, perPage: int) -> PageResult
+    note "slice the rows for the requested page and compute totals"
+  fn find_record : (rows: list<Record>, id: int) -> Record | Absent
+    note "find a single record by id for the detail panel"
+  fn format_value : (cents: int) -> str
+    note "format a numeric value as US dollar currency"
+  fn compare_string : (a: str, b: str) -> int
+    note "locale-aware string comparison returning -1, 0 or 1"
+  fn compare_number : (a: int, b: int) -> int
+    note "numeric comparison returning -1, 0 or 1"

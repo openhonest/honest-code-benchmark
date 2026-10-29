@@ -1,0 +1,79 @@
+module dashboard_ssr_honest
+  layer application
+  note "server-rendered order dashboard with KPI cards, filters, sort and pagination"
+
+  inputs  = { "request" : "HTTP request", "datafile" : "JSON order data on disk" }
+  outputs = { "response" : "HTML page with embedded data for hydration" }
+
+  type Order = { id: int
+                 date: str
+                 customerName: str
+                 category: Category
+                 amount: float
+                 status: Status
+                 items: int }
+
+  type KPIs = { totalOrders: int
+                totalRevenue: float
+                avgOrder: float
+                uniqueCustomers: int }
+
+  type PageResult = { pageRows: list<Order>
+                      totalPages: int
+                      totalFiltered: int }
+
+  type Fault = { reason: str
+                 remedy: str }
+
+  set categories = { "Electronics", "Clothing", "Food", "Books", "Home", "Sports", "Toys", "Health" }
+  vocabulary Category = { categories }
+
+  set statuses = { "pending", "shipped", "delivered", "cancelled", "returned" }
+  vocabulary Status = { statuses }
+
+  set columns = { "id", "date", "customerName", "category", "amount", "status", "items" }
+  vocabulary ColumnKey = { columns }
+
+  set sort_directions = { "asc", "desc" }
+  vocabulary SortDir = { sort_directions }
+
+  dispatch column_types = { "string" -> compare_string,
+                            "number" -> compare_number }
+
+  boundary_in fn handle_request : (archetype: str, arm: str, rows: int) -> str | Fault
+    note "parse the HTTP request and extract archetype, arm and row count"
+    side_effect reads "request"
+
+  reader fn load_data : (path: str) -> list<Order>
+    note "read the JSON order data file from disk"
+    side_effect reads "datafile"
+
+  boundary_out fn send_page : (html: str, renderMs: float) -> str
+    note "send the rendered HTML page with timing headers"
+    side_effect writes "response"
+
+  chain serve = handle_request -> build_page -> send_page
+
+  orchestrator fn build_page : (archetype: str, arm: str, rows: int) -> str
+    note "load data, filter, sort, paginate, compute KPIs and render the full HTML page"
+    invokes load_data, filter_by_category, filter_by_status, filter_by_date_range, sort_rows, paginate, compute_kpis, format_currency
+
+  fn filter_by_category : (rows: list<Order>, category: Category | str) -> list<Order>
+    note "keep rows matching the given category or return all if 'All'"
+  fn filter_by_status : (rows: list<Order>, status: Status | str) -> list<Order>
+    note "keep rows matching the given status or return all if 'All'"
+  fn filter_by_date_range : (rows: list<Order>, from: str, to: str) -> list<Order>
+    note "keep rows whose date falls within the from/to range inclusive"
+  fn sort_rows : (rows: list<Order>, col: ColumnKey, dir: SortDir) -> list<Order>
+    note "sort rows by the given column using the dispatch table for type"
+    invokes column_types
+  fn paginate : (rows: list<Order>, page: int, perPage: int) -> PageResult
+    note "slice the rows for the requested page and compute totals"
+  fn compute_kpis : (rows: list<Order>) -> KPIs
+    note "compute total orders, revenue, average order value and unique customers"
+  fn format_currency : (value: float) -> str
+    note "format a number as USD currency with two decimal places"
+  fn compare_string : (a: str, b: str) -> int
+    note "locale-aware string comparison returning -1, 0 or 1"
+  fn compare_number : (a: float, b: float) -> int
+    note "numeric comparison returning -1, 0 or 1"

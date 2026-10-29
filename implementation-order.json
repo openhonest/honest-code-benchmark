@@ -1,0 +1,67 @@
+{
+  "form": [
+    "11-fastapi-honest-htmx",
+    "9-react-ssr-conventional",
+    "2-redux",
+    "5-stateless-domx",
+    "10-htmx-ejs",
+    "8-react-ssr-domain-classes",
+    "6-react-ssr-stateless-domx",
+    "7-react-ssr-honest",
+    "3-zustand",
+    "1-useState",
+    "4-signals"
+  ],
+  "table": [
+    "6-react-ssr-stateless-domx",
+    "5-stateless-domx",
+    "3-zustand",
+    "1-useState",
+    "2-redux",
+    "7-react-ssr-honest",
+    "9-react-ssr-conventional",
+    "4-signals",
+    "11-fastapi-honest-htmx",
+    "10-htmx-ejs",
+    "8-react-ssr-domain-classes"
+  ],
+  "dashboard": [
+    "11-fastapi-honest-htmx",
+    "1-useState",
+    "4-signals",
+    "2-redux",
+    "10-htmx-ejs",
+    "5-stateless-domx",
+    "3-zustand",
+    "9-react-ssr-conventional",
+    "6-react-ssr-stateless-domx",
+    "7-react-ssr-honest",
+    "8-react-ssr-domain-classes"
+  ],
+  "browser": [
+    "6-react-ssr-stateless-domx",
+    "8-react-ssr-domain-classes",
+    "7-react-ssr-honest",
+    "4-signals",
+    "1-useState",
+    "2-redux",
+    "5-stateless-domx",
+    "3-zustand",
+    "9-react-ssr-conventional",
+    "11-fastapi-honest-htmx",
+    "10-htmx-ejs"
+  ],
+  "grid": [
+    "8-react-ssr-domain-classes",
+    "9-react-ssr-conventional",
+    "6-react-ssr-stateless-domx",
+    "5-stateless-domx",
+    "1-useState",
+    "11-fastapi-honest-htmx",
+    "3-zustand",
+    "7-react-ssr-honest",
+    "2-redux",
+    "4-signals",
+    "10-htmx-ejs"
+  ]
+}

@@ -1,0 +1,67 @@
+module grid_ssr_honest
+  layer application
+  note "server-rendered budget grid with editable cells, selection, bulk fill and computed totals"
+
+  inputs  = { "request" : "HTTP request", "datafile" : "JSON budget data on disk" }
+  outputs = { "response" : "HTML page with embedded data for hydration" }
+
+  type Row = { id: int
+               category: Category
+               description: str
+               q1: float
+               q2: float
+               q3: float
+               q4: float
+               budgetTarget: float }
+
+  type Totals = { q1: float
+                  q2: float
+                  q3: float
+                  q4: float
+                  total: float
+                  budgetTarget: float
+                  variance: float }
+
+  type PageResult = { pageRows: list<Row>
+                      totalPages: int
+                      totalFiltered: int }
+
+  type Fault = { reason: str
+                 remedy: str }
+
+  set categories = { "Engineering", "Sales", "Marketing", "Finance", "HR", "Operations", "Legal", "Support" }
+  vocabulary Category = { categories }
+
+  set quarters = { "q1", "q2", "q3", "q4" }
+  vocabulary Quarter = { quarters }
+
+  boundary_in fn handle_request : (archetype: str, arm: str, rows: int) -> str | Fault
+    note "parse the HTTP request and extract archetype, arm and row count"
+    side_effect reads "request"
+
+  reader fn load_data : (path: str) -> list<Row>
+    note "read the JSON budget data file from disk"
+    side_effect reads "datafile"
+
+  boundary_out fn send_page : (html: str, renderMs: float) -> str
+    note "send the rendered HTML page with timing headers"
+    side_effect writes "response"
+
+  chain serve = handle_request -> build_page -> send_page
+
+  orchestrator fn build_page : (archetype: str, arm: str, rows: int) -> str
+    note "load data, filter, paginate, compute totals, format and render the full HTML page"
+    invokes load_data, filter_by_category, paginate, compute_row_total, compute_row_variance, compute_totals, format_number
+
+  fn filter_by_category : (rows: list<Row>, category: Category | str) -> list<Row>
+    note "keep rows matching the given category or return all if 'All'"
+  fn paginate : (rows: list<Row>, page: int, perPage: int) -> PageResult
+    note "slice the rows for the requested page and compute totals"
+  fn compute_row_total : (row: Row) -> float
+    note "sum q1 q2 q3 q4 for a single row"
+  fn compute_row_variance : (row: Row) -> float
+    note "compute total minus budgetTarget for a single row"
+  fn compute_totals : (rows: list<Row>) -> Totals
+    note "aggregate q1 q2 q3 q4 totals and variance for all given rows"
+  fn format_number : (value: float) -> str
+    note "format a number with two decimal places"

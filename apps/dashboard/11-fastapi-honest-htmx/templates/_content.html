@@ -1,0 +1,134 @@
+<div id="dashboard-content"
+     data-sort-col="{{ sort_col }}"
+     data-sort-dir="{{ sort_dir }}"
+     data-category="{{ category }}"
+     data-status="{{ status }}"
+     data-date-from="{{ date_from }}"
+     data-date-to="{{ date_to }}"
+     data-page="{{ page }}">
+
+  <input type="hidden" name="sortCol" value="{{ sort_col }}">
+  <input type="hidden" name="sortDir" value="{{ sort_dir }}">
+  <input type="hidden" name="category" value="{{ category }}">
+  <input type="hidden" name="status" value="{{ status }}">
+  <input type="hidden" name="dateFrom" value="{{ date_from }}">
+  <input type="hidden" name="dateTo" value="{{ date_to }}">
+  <input type="hidden" name="page" value="{{ page }}">
+
+  <div class="dashboard-cards">
+    <div class="card">
+      <div class="card-label">Total Orders</div>
+      <div class="card-value" data-role="total-orders">{{ metrics.total_orders }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Revenue</div>
+      <div class="card-value" data-role="total-revenue">
+        <span fx-format="currency" fx-raw="{{ metrics.total_revenue }}" fx-currency="USD" fx-cloak>{{ "%.2f"|format(metrics.total_revenue) }}</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Order</div>
+      <div class="card-value" data-role="avg-order">
+        <span fx-format="currency" fx-raw="{{ metrics.avg_order }}" fx-currency="USD" fx-cloak>{{ "%.2f"|format(metrics.avg_order) }}</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Unique Customers</div>
+      <div class="card-value" data-role="unique-customers">{{ metrics.unique_customers }}</div>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <select name="categoryInput"
+            data-role="category-filter"
+            hx-get="{{ base_path }}/filter"
+            hx-trigger="change"
+            hx-target="#dashboard-content"
+            hx-swap="outerHTML"
+            hx-include="#dashboard-content input[type=hidden]">
+      <option value="All" {% if category == 'All' %}selected{% endif %}>All Categories</option>
+      {% for c in categories %}
+      <option value="{{ c }}" {% if category == c %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+    <select name="statusInput"
+            data-role="status-filter"
+            hx-get="{{ base_path }}/filter"
+            hx-trigger="change"
+            hx-target="#dashboard-content"
+            hx-swap="outerHTML"
+            hx-include="#dashboard-content input[type=hidden]">
+      <option value="All" {% if status == 'All' %}selected{% endif %}>All Statuses</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <input type="date"
+           name="dateFromInput"
+           data-role="date-from"
+           value="{{ date_from }}"
+           hx-get="{{ base_path }}/filter"
+           hx-trigger="change"
+           hx-target="#dashboard-content"
+           hx-swap="outerHTML"
+           hx-include="#dashboard-content input[type=hidden]">
+    <input type="date"
+           name="dateToInput"
+           data-role="date-to"
+           value="{{ date_to }}"
+           hx-get="{{ base_path }}/filter"
+           hx-trigger="change"
+           hx-target="#dashboard-content"
+           hx-swap="outerHTML"
+           hx-include="#dashboard-content input[type=hidden]">
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        {% for col in columns %}
+        <th data-column="{{ col.key }}"
+            hx-get="{{ base_path }}/sort?col={{ col.key }}"
+            hx-target="#dashboard-content"
+            hx-swap="outerHTML"
+            hx-include="#dashboard-content input[type=hidden]"
+            style="cursor:pointer">
+          {{ col.label }}
+          <span class="sort-indicator{% if sort_col == col.key %} active{% endif %}">
+            {% if sort_col != col.key %}↕{% elif sort_dir == 'asc' %}↑{% else %}↓{% endif %}
+          </span>
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr data-row="{{ row.id }}">
+        <td>{{ row.id }}</td>
+        <td><span fx-format="date" fx-raw="{{ row.date }}" fx-cloak>{{ row.date }}</span></td>
+        <td>{{ row.customerName }}</td>
+        <td>{{ row.category }}</td>
+        <td><span fx-format="currency" fx-raw="{{ row.amount }}" fx-currency="USD" fx-cloak>{{ "%.2f"|format(row.amount) }}</span></td>
+        <td><span class="status-badge status-{{ row.status }}">{{ row.status }}</span></td>
+        <td>{{ row.items }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="pagination">
+    <button data-action="prev-page"
+            {% if page <= 1 %}disabled{% endif %}
+            hx-get="{{ base_path }}/page?p={{ page - 1 }}"
+            hx-target="#dashboard-content"
+            hx-swap="outerHTML"
+            hx-include="#dashboard-content input[type=hidden]">Previous</button>
+    <span class="page-info" data-role="page-info">Page {{ page }} of {{ total_pages }}</span>
+    <button data-action="next-page"
+            {% if page >= total_pages %}disabled{% endif %}
+            hx-get="{{ base_path }}/page?p={{ page + 1 }}"
+            hx-target="#dashboard-content"
+            hx-swap="outerHTML"
+            hx-include="#dashboard-content input[type=hidden]">Next</button>
+  </div>
+</div>

@@ -1,0 +1,109 @@
+<div id="table-content"
+     data-sort-col="{{ sort_col }}"
+     data-sort-dir="{{ sort_dir }}"
+     data-filter="{{ filter_text }}"
+     data-page="{{ page }}"
+     data-selected='{{ selected_json }}'>
+
+  <div class="table-toolbar">
+    <input type="text"
+           name="filterInput"
+           value="{{ filter_text }}"
+           placeholder="Filter rows..."
+           hx-get="{{ base_path }}/filter"
+           hx-trigger="keyup changed delay:300ms"
+           hx-target="#table-content"
+           hx-swap="outerHTML"
+           hx-include="#table-content"
+           hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","page":"1","selected":"{{ selected_json }}"}'>
+
+    {% if sel_count > 0 %}
+    <button hx-post="{{ base_path }}/delete"
+            hx-target="#table-content"
+            hx-swap="outerHTML"
+            hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","page":"{{ page }}","selected":"{{ selected_json }}"}'>
+      Delete {{ sel_count }} selected
+    </button>
+    {% endif %}
+
+    <span class="row-count">{{ total_rows }} rows</span>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>
+          <input type="checkbox"
+                 {% if all_visible_selected %}checked{% endif %}
+                 hx-post="{{ base_path }}/toggle-all"
+                 hx-target="#table-content"
+                 hx-swap="outerHTML"
+                 hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","page":"{{ page }}","selected":"{{ selected_json }}"}'>
+        </th>
+        {% for col in columns %}
+        <th hx-get="{{ base_path }}/sort?col={{ col.key }}"
+            hx-target="#table-content"
+            hx-swap="outerHTML"
+            hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","page":"{{ page }}","selected":"{{ selected_json }}"}'
+            style="cursor:pointer">
+          {{ col.label }}
+          {% if sort_col == col.key %}
+            {% if sort_dir == 'asc' %} ▲{% else %} ▼{% endif %}
+          {% endif %}
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>
+          <input type="checkbox"
+                 {% if row.id in selected_ids %}checked{% endif %}
+                 hx-post="{{ base_path }}/toggle?id={{ row.id }}"
+                 hx-target="#table-content"
+                 hx-swap="outerHTML"
+                 hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","page":"{{ page }}","selected":"{{ selected_json }}"}'>
+        </td>
+        {% for col in columns %}
+        <td hx-get="{{ base_path }}/edit-cell?id={{ row.id }}&col={{ col.key }}"
+            hx-trigger="dblclick"
+            hx-swap="innerHTML">
+          {% if col.key == 'salary' %}
+          <span fx-format="currency" fx-raw="{{ row[col.key] }}" fx-currency="USD" fx-cloak>{{ row[col.key] }}</span>
+          {% elif col.key == 'hireDate' %}
+          <span fx-format="date" fx-raw="{{ row[col.key] }}" fx-cloak>{{ row[col.key] }}</span>
+          {% elif col.key == 'active' %}
+          {{ 'Yes' if row[col.key] else 'No' }}
+          {% else %}
+          {{ row[col.key] }}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}
+    <button hx-get="{{ base_path }}/page?p={{ page - 1 }}"
+            hx-target="#table-content"
+            hx-swap="outerHTML"
+            hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","selected":"{{ selected_json }}"}'>
+      Previous
+    </button>
+    {% endif %}
+    <span>Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <button hx-get="{{ base_path }}/page?p={{ page + 1 }}"
+            hx-target="#table-content"
+            hx-swap="outerHTML"
+            hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","selected":"{{ selected_json }}"}'>
+      Next
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>

@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+harness/results/
+apps/package-lock.json
+harness/package-lock.json
+
+# Separate repos living in this workspace (not part of the benchmark)
+/domx/
+/genX/
+/stateless/
+/dataos-site/

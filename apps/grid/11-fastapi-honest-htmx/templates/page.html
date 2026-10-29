@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Benchmark: {{ archetype }} / {{ arm }}</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="/domx/domx.min.js"></script>
+  <script src="/genx/bootloader.min.js"></script>
+  <style>[fx-cloak]{display:none!important}</style>
+</head>
+<body>
+  <div id="root">
+    <div class="app">
+      {{ content_block | safe }}
+    </div>
+  </div>
+  <script>
+    window.__BENCHMARK_CONFIG__ = { archetype: "{{ archetype }}", arm: "{{ arm }}", rows: {{ data_rows }} };
+  </script>
+</body>
+</html>

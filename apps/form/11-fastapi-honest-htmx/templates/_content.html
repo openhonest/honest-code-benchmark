@@ -1,0 +1,193 @@
+<div id="form-content"
+     data-step="{{ step }}"
+     data-account-type="{{ fields.accountType }}">
+
+  {% for key, val in fields.items() %}
+  <input type="hidden" name="{{ key }}" value="{{ val }}">
+  {% endfor %}
+  <input type="hidden" name="step" value="{{ step }}">
+  <input type="hidden" name="errors" value='{{ errors_json }}'>
+
+  <div class="form-progress">
+    {% for s in range(1, total_steps + 1) %}
+    <span class="step-dot{{ ' active' if s == step else '' }}{{ ' done' if s < step else '' }}">{{ s }}</span>
+    {% endfor %}
+  </div>
+
+  {% if step == 1 %}
+  <div class="form-step" data-step="1">
+    <h2>Contact Information</h2>
+
+    <div class="form-field{{ ' has-error' if 'firstName' in errors else '' }}">
+      <label>First Name *</label>
+      <input type="text" name="firstName" value="{{ fields.firstName }}" data-field="firstName" hx-swap="none">
+      {% if 'firstName' in errors %}<span class="error" data-role="error">First Name is required</span>{% endif %}
+    </div>
+
+    <div class="form-field{{ ' has-error' if 'lastName' in errors else '' }}">
+      <label>Last Name *</label>
+      <input type="text" name="lastName" value="{{ fields.lastName }}" data-field="lastName" hx-swap="none">
+      {% if 'lastName' in errors %}<span class="error" data-role="error">Last Name is required</span>{% endif %}
+    </div>
+
+    <div class="form-field{{ ' has-error' if 'email' in errors else '' }}">
+      <label>Email *</label>
+      <input type="email" name="email" value="{{ fields.email }}" data-field="email" hx-swap="none">
+      {% if 'email' in errors %}<span class="error" data-role="error">Email is required</span>{% endif %}
+    </div>
+
+    <div class="form-field{{ ' has-error' if 'phone' in errors else '' }}">
+      <label>Phone *</label>
+      <input type="tel" name="phone" value="{{ fields.phone }}" data-field="phone" hx-swap="none">
+      {% if 'phone' in errors %}<span class="error" data-role="error">Phone is required</span>{% endif %}
+    </div>
+
+    <div class="form-actions">
+      <button data-role="next-step"
+              hx-post="{{ base_path }}/next"
+              hx-target="#form-content"
+              hx-swap="outerHTML"
+              hx-include="#form-content input">Next</button>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if step == 2 %}
+  <div class="form-step" data-step="2">
+    <h2>Address</h2>
+
+    <div class="form-field{{ ' has-error' if 'street' in errors else '' }}">
+      <label>Street *</label>
+      <input type="text" name="street" value="{{ fields.street }}" data-field="street" hx-swap="none">
+      {% if 'street' in errors %}<span class="error" data-role="error">Street is required</span>{% endif %}
+    </div>
+
+    <div class="form-field{{ ' has-error' if 'city' in errors else '' }}">
+      <label>City *</label>
+      <input type="text" name="city" value="{{ fields.city }}" data-field="city" hx-swap="none">
+      {% if 'city' in errors %}<span class="error" data-role="error">City is required</span>{% endif %}
+    </div>
+
+    <div class="form-field{{ ' has-error' if 'state' in errors else '' }}">
+      <label>State *</label>
+      <select name="state" data-field="state" hx-swap="none">
+        <option value="">Select...</option>
+        {% for st in us_states %}
+        <option value="{{ st }}"{{ ' selected' if fields.state == st else '' }}>{{ st }}</option>
+        {% endfor %}
+      </select>
+      {% if 'state' in errors %}<span class="error" data-role="error">State is required</span>{% endif %}
+    </div>
+
+    <div class="form-field{{ ' has-error' if 'zip' in errors else '' }}">
+      <label>ZIP *</label>
+      <input type="text" name="zip" value="{{ fields.zip }}" data-field="zip" hx-swap="none">
+      {% if 'zip' in errors %}<span class="error" data-role="error">ZIP is required</span>{% endif %}
+    </div>
+
+    <div class="form-field{{ ' has-error' if 'country' in errors else '' }}">
+      <label>Country *</label>
+      <select name="country" data-field="country" hx-swap="none">
+        <option value="">Select...</option>
+        {% for c in countries %}
+        <option value="{{ c }}"{{ ' selected' if fields.country == c else '' }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+      {% if 'country' in errors %}<span class="error" data-role="error">Country is required</span>{% endif %}
+    </div>
+
+    <div class="form-actions">
+      <button data-role="prev-step"
+              hx-post="{{ base_path }}/prev"
+              hx-target="#form-content"
+              hx-swap="outerHTML"
+              hx-include="#form-content input, #form-content select">Previous</button>
+      <button data-role="next-step"
+              hx-post="{{ base_path }}/next"
+              hx-target="#form-content"
+              hx-swap="outerHTML"
+              hx-include="#form-content input, #form-content select">Next</button>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if step == 3 %}
+  <div class="form-step" data-step="3">
+    <h2>Account Type</h2>
+
+    <div class="form-field">
+      <label>Account Type *</label>
+      <select name="accountType" data-role="account-type" data-field="accountType" hx-swap="none">
+        <option value="individual"{{ ' selected' if fields.accountType == 'individual' else '' }}>Individual</option>
+        <option value="business"{{ ' selected' if fields.accountType == 'business' else '' }}>Business</option>
+      </select>
+    </div>
+
+    {% if fields.accountType == 'business' %}
+    <div class="form-field{{ ' has-error' if 'companyName' in errors else '' }}">
+      <label>Company Name *</label>
+      <input type="text" name="companyName" value="{{ fields.companyName }}" data-field="companyName" hx-swap="none">
+      {% if 'companyName' in errors %}<span class="error" data-role="error">Company Name is required</span>{% endif %}
+    </div>
+
+    <div class="form-field{{ ' has-error' if 'taxId' in errors else '' }}">
+      <label>Tax ID *</label>
+      <input type="text" name="taxId" value="{{ fields.taxId }}" data-field="taxId" hx-swap="none">
+      {% if 'taxId' in errors %}<span class="error" data-role="error">Tax ID is required</span>{% endif %}
+    </div>
+
+    <div class="form-field">
+      <label>PO Number</label>
+      <input type="text" name="poNumber" value="{{ fields.poNumber }}" data-field="poNumber" hx-swap="none">
+    </div>
+    {% endif %}
+
+    <div class="form-actions">
+      <button data-role="prev-step"
+              hx-post="{{ base_path }}/prev"
+              hx-target="#form-content"
+              hx-swap="outerHTML"
+              hx-include="#form-content input, #form-content select">Previous</button>
+      <button data-role="next-step"
+              hx-post="{{ base_path }}/next"
+              hx-target="#form-content"
+              hx-swap="outerHTML"
+              hx-include="#form-content input, #form-content select">Next</button>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if step == 4 %}
+  <div class="form-step" data-step="4">
+    <h2>Review</h2>
+    <dl class="review-list">
+      <dt>Name</dt><dd>{{ fields.firstName }} {{ fields.lastName }}</dd>
+      <dt>Email</dt><dd>{{ fields.email }}</dd>
+      <dt>Phone</dt><dd><span fx-format="phone" fx-raw="{{ fields.phone }}" fx-cloak>{{ fields.phone }}</span></dd>
+      <dt>Address</dt><dd>{{ fields.street }}, {{ fields.city }}, {{ fields.state }} {{ fields.zip }}</dd>
+      <dt>Country</dt><dd>{{ fields.country }}</dd>
+      <dt>Account Type</dt><dd>{{ fields.accountType }}</dd>
+      {% if fields.accountType == 'business' %}
+      <dt>Company</dt><dd>{{ fields.companyName }}</dd>
+      <dt>Tax ID</dt><dd>{{ fields.taxId }}</dd>
+      {% if fields.poNumber %}
+      <dt>PO Number</dt><dd>{{ fields.poNumber }}</dd>
+      {% endif %}
+      {% endif %}
+    </dl>
+    <div class="form-actions">
+      <button data-role="prev-step"
+              hx-post="{{ base_path }}/prev"
+              hx-target="#form-content"
+              hx-swap="outerHTML"
+              hx-include="#form-content input">Previous</button>
+      <button class="primary"
+              data-role="submit"
+              hx-post="{{ base_path }}/submit"
+              hx-target="#form-content"
+              hx-swap="outerHTML"
+              hx-include="#form-content input">Submit</button>
+    </div>
+  </div>
+  {% endif %}
+</div>

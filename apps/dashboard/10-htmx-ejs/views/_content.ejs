@@ -1,0 +1,134 @@
+<div id="dashboard-content">
+  <input type="hidden" name="sortCol" value="<%= sortCol %>" />
+  <input type="hidden" name="sortDir" value="<%= sortDir %>" />
+  <input type="hidden" name="category" value="<%= category %>" />
+  <input type="hidden" name="status" value="<%= status %>" />
+  <input type="hidden" name="dateFrom" value="<%= dateFrom %>" />
+  <input type="hidden" name="dateTo" value="<%= dateTo %>" />
+  <input type="hidden" name="page" value="<%= page %>" />
+
+  <div class="dashboard-cards">
+    <div class="card">
+      <div class="card-label">Total Orders</div>
+      <div class="card-value" data-role="total-orders"><%= metrics.totalOrders %></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Revenue</div>
+      <div class="card-value" data-role="total-revenue">$<%= metrics.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Order</div>
+      <div class="card-value" data-role="avg-order">$<%= metrics.avgOrder.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Unique Customers</div>
+      <div class="card-value" data-role="unique-customers"><%= metrics.uniqueCustomers %></div>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <select
+      name="categoryInput"
+      data-role="category-filter"
+      hx-get="<%= basePath %>/filter"
+      hx-trigger="change"
+      hx-target="#dashboard-content"
+      hx-swap="outerHTML"
+      hx-include="#dashboard-content input[type=hidden]"
+    >
+      <option value="All" <%= category === 'All' ? 'selected' : '' %>>All Categories</option>
+      <% categories.forEach(function(c) { %>
+        <option value="<%= c %>" <%= category === c ? 'selected' : '' %>><%= c %></option>
+      <% }) %>
+    </select>
+    <select
+      name="statusInput"
+      data-role="status-filter"
+      hx-get="<%= basePath %>/filter"
+      hx-trigger="change"
+      hx-target="#dashboard-content"
+      hx-swap="outerHTML"
+      hx-include="#dashboard-content input[type=hidden]"
+    >
+      <option value="All" <%= status === 'All' ? 'selected' : '' %>>All Statuses</option>
+      <% statuses.forEach(function(s) { %>
+        <option value="<%= s %>" <%= status === s ? 'selected' : '' %>><%= s %></option>
+      <% }) %>
+    </select>
+    <input
+      type="date"
+      name="dateFromInput"
+      data-role="date-from"
+      value="<%= dateFrom %>"
+      hx-get="<%= basePath %>/filter"
+      hx-trigger="change"
+      hx-target="#dashboard-content"
+      hx-swap="outerHTML"
+      hx-include="#dashboard-content input[type=hidden]"
+    />
+    <input
+      type="date"
+      name="dateToInput"
+      data-role="date-to"
+      value="<%= dateTo %>"
+      hx-get="<%= basePath %>/filter"
+      hx-trigger="change"
+      hx-target="#dashboard-content"
+      hx-swap="outerHTML"
+      hx-include="#dashboard-content input[type=hidden]"
+    />
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <% columns.forEach(function(col) { %>
+          <th data-column="<%= col.key %>"
+              hx-get="<%= basePath %>/sort?col=<%= col.key %>"
+              hx-target="#dashboard-content"
+              hx-swap="outerHTML"
+              hx-include="#dashboard-content input[type=hidden]"
+              style="cursor:pointer">
+            <%= col.label %>
+            <span class="sort-indicator<%= sortCol === col.key ? ' active' : '' %>">
+              <%= sortCol !== col.key ? '↕' : sortDir === 'asc' ? '↑' : '↓' %>
+            </span>
+          </th>
+        <% }) %>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach(function(row) { %>
+        <tr data-row="<%= row.id %>">
+          <td><%= row.id %></td>
+          <td><%= row.date %></td>
+          <td><%= row.customerName %></td>
+          <td><%= row.category %></td>
+          <td>$<%= row.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+          <td><span class="status-badge status-<%= row.status %>"><%= row.status %></span></td>
+          <td><%= row.items %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="pagination">
+    <button
+      data-action="prev-page"
+      <%= page <= 1 ? 'disabled' : '' %>
+      hx-get="<%= basePath %>/page?p=<%= page - 1 %>"
+      hx-target="#dashboard-content"
+      hx-swap="outerHTML"
+      hx-include="#dashboard-content input[type=hidden]"
+    >Previous</button>
+    <span class="page-info" data-role="page-info">Page <%= page %> of <%= totalPages %></span>
+    <button
+      data-action="next-page"
+      <%= page >= totalPages ? 'disabled' : '' %>
+      hx-get="<%= basePath %>/page?p=<%= page + 1 %>"
+      hx-target="#dashboard-content"
+      hx-swap="outerHTML"
+      hx-include="#dashboard-content input[type=hidden]"
+    >Next</button>
+  </div>
+</div>

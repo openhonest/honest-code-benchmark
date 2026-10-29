@@ -1,0 +1,114 @@
+<div id="table-content">
+  <input type="hidden" name="sortCol" value="<%= sortCol %>" />
+  <input type="hidden" name="sortDir" value="<%= sortDir %>" />
+  <input type="hidden" name="filter" value="<%= filter %>" />
+  <input type="hidden" name="page" value="<%= page %>" />
+  <input type="hidden" name="selected" value="<%= JSON.stringify(selectedIds) %>" />
+
+  <div class="filter-bar">
+    <input
+      type="text"
+      name="filterInput"
+      placeholder="Filter by name, email, or department..."
+      value="<%= filter %>"
+      data-role="filter-input"
+      hx-get="<%= basePath %>/filter"
+      hx-trigger="keyup changed delay:300ms"
+      hx-target="#table-content"
+      hx-swap="outerHTML"
+      hx-include="#table-content input[type=hidden]"
+    />
+  </div>
+
+  <div class="toolbar">
+    <span class="selection-count"><%= selCount %> of <%= totalRows %> selected</span>
+    <button
+      class="danger"
+      data-action="delete-selected"
+      <%= selCount === 0 ? 'disabled' : '' %>
+      hx-post="<%= basePath %>/delete"
+      hx-target="#table-content"
+      hx-swap="outerHTML"
+      hx-include="#table-content input[type=hidden]"
+    >Delete selected</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>
+          <input
+            type="checkbox"
+            data-role="select-all"
+            <%= allVisibleSelected ? 'checked' : '' %>
+            hx-post="<%= basePath %>/toggle-all"
+            hx-target="#table-content"
+            hx-swap="outerHTML"
+            hx-include="#table-content input[type=hidden]"
+          />
+        </th>
+        <% columns.forEach(function(col) { %>
+          <th data-column="<%= col.key %>"
+              hx-get="<%= basePath %>/sort?col=<%= col.key %>"
+              hx-target="#table-content"
+              hx-swap="outerHTML"
+              hx-include="#table-content input[type=hidden]"
+              style="cursor:pointer">
+            <%= col.label %>
+            <span class="sort-indicator<%= sortCol === col.key ? ' active' : '' %>">
+              <%= sortCol !== col.key ? '↕' : sortDir === 'asc' ? '↑' : '↓' %>
+            </span>
+          </th>
+        <% }) %>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach(function(row) { %>
+        <tr data-row="<%= row.id %>" class="<%= selectedIds[row.id] ? 'selected' : '' %>">
+          <td>
+            <input
+              type="checkbox"
+              data-role="row-checkbox"
+              <%= selectedIds[row.id] ? 'checked' : '' %>
+              hx-post="<%= basePath %>/toggle?id=<%= row.id %>"
+              hx-target="#table-content"
+              hx-swap="outerHTML"
+              hx-include="#table-content input[type=hidden]"
+            />
+          </td>
+          <% columns.forEach(function(col) { %>
+            <td data-column="<%= col.key %>"
+              <% if (col.key === 'name' || col.key === 'salary') { %>
+                hx-get="<%= basePath %>/edit-cell?id=<%= row.id %>&col=<%= col.key %>"
+                hx-trigger="dblclick"
+                hx-target="this"
+                hx-swap="outerHTML"
+                hx-include="#table-content input[type=hidden]"
+              <% } %>
+            ><%- col.key === 'salary' ? '$' + row[col.key].toLocaleString() : col.key === 'active' ? (row[col.key] ? 'Yes' : 'No') : row[col.key] %></td>
+          <% }) %>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="pagination">
+    <button
+      data-action="prev-page"
+      <%= page <= 1 ? 'disabled' : '' %>
+      hx-get="<%= basePath %>/page?p=<%= page - 1 %>"
+      hx-target="#table-content"
+      hx-swap="outerHTML"
+      hx-include="#table-content input[type=hidden]"
+    >Previous</button>
+    <span class="page-info" data-role="page-info">Page <%= page %> of <%= totalPages %></span>
+    <button
+      data-action="next-page"
+      <%= page >= totalPages ? 'disabled' : '' %>
+      hx-get="<%= basePath %>/page?p=<%= page + 1 %>"
+      hx-target="#table-content"
+      hx-swap="outerHTML"
+      hx-include="#table-content input[type=hidden]"
+    >Next</button>
+  </div>
+</div>

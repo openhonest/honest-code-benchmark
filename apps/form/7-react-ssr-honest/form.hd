@@ -1,0 +1,85 @@
+module form_ssr_honest
+  layer application
+  note "server-rendered multi-step form with validation and conditional fields"
+
+  inputs  = { "request" : "HTTP request", "datafile" : "JSON prefill data on disk" }
+  outputs = { "response" : "HTML page with embedded data for hydration" }
+
+  type Fields = { firstName: str
+                  lastName: str
+                  email: str
+                  phone: str
+                  street: str
+                  city: str
+                  state: USState | str
+                  zip: str
+                  country: Country
+                  accountType: AccountType
+                  companyName: str
+                  taxId: str
+                  poNumber: str }
+
+  type StepErrors = { fieldName: str
+                      present: bool }
+
+  type ReviewLine = { label: str
+                      value: str }
+
+  type Fault = { reason: str
+                 remedy: str }
+
+  set account_types = { "individual", "business" }
+  vocabulary AccountType = { account_types }
+
+  set steps = { "1", "2", "3", "4" }
+  vocabulary StepNumber = { steps }
+
+  set countries = { "US", "CA", "MX", "GB", "DE", "FR", "JP", "AU", "BR", "IN" }
+  vocabulary Country = { countries }
+
+  set us_states = { "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+                    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+                    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+                    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+                    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY" }
+  vocabulary USState = { us_states }
+
+  boundary_in fn handle_request : (archetype: str, arm: str) -> str | Fault
+    note "parse the HTTP request and extract archetype and arm identifiers"
+    side_effect reads "request"
+
+  reader fn load_data : (path: str) -> list<Fields>
+    note "read the JSON prefill data file from disk"
+    side_effect reads "datafile"
+
+  boundary_out fn send_page : (html: str, renderMs: float) -> str
+    note "send the rendered HTML page with timing headers"
+    side_effect writes "response"
+
+  chain serve = handle_request -> build_page -> send_page
+
+  orchestrator fn build_page : (archetype: str, arm: str) -> str
+    note "load data, prefill the form and render the full HTML page"
+    invokes load_data, prefill_from_record, validate_step, validate_business, next_step, update_field, clear_error, format_review
+
+  fn prefill_from_record : (record: Fields) -> Fields
+    note "extract form field values from a data record, defaulting missing fields"
+
+  fn validate_step : (fields: Fields, stepNum: StepNumber) -> StepErrors
+    note "check required fields for a given step number"
+
+  fn validate_business : (fields: Fields) -> StepErrors
+    note "check that business accounts have companyName and taxId filled"
+
+  fn next_step : (fields: Fields, currentStep: StepNumber) -> StepNumber | StepErrors
+    note "advance to the next step if the current step validates, else return errors"
+    invokes validate_step, validate_business
+
+  fn update_field : (fields: Fields, name: str, value: str) -> Fields
+    note "return a new fields object with one field value replaced"
+
+  fn clear_error : (errors: StepErrors, name: str) -> StepErrors
+    note "remove the error entry for a given field name"
+
+  fn format_review : (fields: Fields) -> list<ReviewLine>
+    note "build label-value pairs for the review step display"

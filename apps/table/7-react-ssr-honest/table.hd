@@ -1,0 +1,74 @@
+module table_ssr_honest
+  layer application
+  note "server-rendered table with sort, filter, paginate, select, edit, delete"
+
+  inputs  = { "request" : "HTTP request carrying archetype, arm and row count",
+              "datafile" : "JSON array of row records on disk" }
+  outputs = { "response" : "HTML page with embedded data for hydration" }
+
+  type Row = { id: int
+               name: str
+               email: str
+               department: Department
+               hireDate: str
+               salary: int
+               active: bool }
+
+  type ViewState = { sortCol: ColumnKey | Absent
+                     sortDir: SortDir | Absent
+                     filterText: str
+                     currentPage: int }
+
+  type PageResult = { pageRows: list<Row>
+                      totalPages: int
+                      totalFiltered: int }
+
+  type Fault = { reason: str
+                 remedy: str }
+
+  set columns = { "name", "email", "department", "hireDate", "salary", "active" }
+  vocabulary ColumnKey = { columns }
+
+  set sort_directions = { "asc", "desc" }
+  vocabulary SortDir = { sort_directions }
+
+  set departments = { "Engineering", "Sales", "Marketing", "Finance", "HR", "Operations", "Legal", "Support" }
+  vocabulary Department = { departments }
+
+  dispatch sort_comparators = { "string" -> compare_string,
+                                "number" -> compare_number,
+                                "boolean" -> compare_boolean }
+
+  boundary_in fn handle_request : (archetype: str, arm: str, rows: int) -> str | Fault
+    note "parse the HTTP request and extract archetype, arm and row count"
+    side_effect reads "request"
+
+  reader fn load_data : (path: str) -> list<Row>
+    note "read the JSON data file from disk"
+    side_effect reads "datafile"
+
+  boundary_out fn send_page : (html: str, renderMs: float) -> str
+    note "send the rendered HTML page with timing headers"
+    side_effect writes "response"
+
+  chain serve = handle_request -> build_page -> send_page
+
+  orchestrator fn build_page : (archetype: str, arm: str, rows: int) -> str
+    note "load data, filter, sort, paginate, format and render the full HTML page"
+    invokes load_data, filter_rows, sort_rows, paginate, format_cell
+
+  fn filter_rows : (rows: list<Row>, text: str) -> list<Row>
+    note "keep rows whose name, email or department contains the text"
+  fn sort_rows : (rows: list<Row>, col: ColumnKey, dir: SortDir) -> list<Row>
+    note "sort rows by the given column using the dispatch table"
+    invokes sort_comparators
+  fn paginate : (rows: list<Row>, page: int, perPage: int) -> PageResult
+    note "slice the rows for the requested page and compute totals"
+  fn compare_string : (a: str, b: str) -> int
+    note "locale-aware string comparison returning -1, 0 or 1"
+  fn compare_number : (a: int, b: int) -> int
+    note "numeric comparison returning -1, 0 or 1"
+  fn compare_boolean : (a: bool, b: bool) -> int
+    note "boolean comparison with false before true"
+  fn format_cell : (column: ColumnKey, value: str | int | bool) -> str
+    note "format a cell value for display based on column type"

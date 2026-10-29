@@ -1,0 +1,111 @@
+<div id="browser-content">
+  <input type="hidden" name="sortCol" value="<%= sortCol %>" />
+  <input type="hidden" name="sortDir" value="<%= sortDir %>" />
+  <input type="hidden" name="search" value="<%= search %>" />
+  <input type="hidden" name="statusFilter" value="<%= statusFilter %>" />
+  <input type="hidden" name="page" value="<%= page %>" />
+  <input type="hidden" name="selectedId" value="<%= selectedId %>" />
+
+  <div class="filter-bar">
+    <input
+      type="text"
+      name="searchInput"
+      placeholder="Search by name..."
+      value="<%= search %>"
+      data-role="search-input"
+      hx-get="<%= basePath %>/search"
+      hx-trigger="keyup changed delay:300ms"
+      hx-target="#browser-content"
+      hx-swap="outerHTML"
+      hx-include="#browser-content input[type=hidden]"
+    />
+  </div>
+
+  <div class="toolbar">
+    <button
+      class="<%= statusFilter === 'all' ? 'active' : '' %>"
+      data-role="status-filter"
+      data-status="all"
+      hx-get="<%= basePath %>/status-filter?status=all"
+      hx-target="#browser-content"
+      hx-swap="outerHTML"
+      hx-include="#browser-content input[type=hidden]"
+    >All</button>
+    <% statuses.forEach(function(s) { %>
+      <button
+        class="<%= statusFilter === s ? 'active' : '' %>"
+        data-role="status-filter"
+        data-status="<%= s %>"
+        hx-get="<%= basePath %>/status-filter?status=<%= s %>"
+        hx-target="#browser-content"
+        hx-swap="outerHTML"
+        hx-include="#browser-content input[type=hidden]"
+      ><%= s.charAt(0).toUpperCase() + s.slice(1) %></button>
+    <% }) %>
+    <span style="margin-left: auto"><%= totalRows %> records</span>
+  </div>
+
+  <div style="display: flex; gap: 1rem">
+    <div style="flex: 1">
+      <table>
+        <thead>
+          <tr>
+            <% columns.forEach(function(col) { %>
+              <th data-column="<%= col.key %>"
+                  hx-get="<%= basePath %>/sort?col=<%= col.key %>"
+                  hx-target="#browser-content"
+                  hx-swap="outerHTML"
+                  hx-include="#browser-content input[type=hidden]"
+                  style="cursor: pointer">
+                <%= col.label %>
+                <span class="sort-indicator<%= sortCol === col.key ? ' active' : '' %>">
+                  <%= sortCol !== col.key ? '↕' : sortDir === 'asc' ? '↑' : '↓' %>
+                </span>
+              </th>
+            <% }) %>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function(row) { %>
+            <tr data-row="<%= row.id %>"
+                class="<%= String(selectedId) === String(row.id) ? 'selected' : '' %>"
+                style="cursor: pointer"
+                hx-get="<%= basePath %>/select?id=<%= row.id %>"
+                hx-target="#browser-content"
+                hx-swap="outerHTML"
+                hx-include="#browser-content input[type=hidden]"
+            >
+              <td data-column="name"><%= row.name %></td>
+              <td data-column="status"><span class="badge badge-<%= row.status %>"><%= row.status %></span></td>
+              <td data-column="createdDate"><%= row.createdDate %></td>
+              <td data-column="value">$<%= row.value.toLocaleString() %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <div class="pagination">
+        <button
+          data-action="prev-page"
+          <%= page <= 1 ? 'disabled' : '' %>
+          hx-get="<%= basePath %>/page?p=<%= page - 1 %>"
+          hx-target="#browser-content"
+          hx-swap="outerHTML"
+          hx-include="#browser-content input[type=hidden]"
+        >Previous</button>
+        <span class="page-info" data-role="page-info">Page <%= page %> of <%= totalPages %></span>
+        <button
+          data-action="next-page"
+          <%= page >= totalPages ? 'disabled' : '' %>
+          hx-get="<%= basePath %>/page?p=<%= page + 1 %>"
+          hx-target="#browser-content"
+          hx-swap="outerHTML"
+          hx-include="#browser-content input[type=hidden]"
+        >Next</button>
+      </div>
+    </div>
+
+    <% if (selectedRecord) { %>
+      <%- include('./_detail.ejs', { record: selectedRecord, basePath }) %>
+    <% } %>
+  </div>
+</div>

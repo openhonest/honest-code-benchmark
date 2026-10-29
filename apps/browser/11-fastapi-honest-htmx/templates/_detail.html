@@ -1,0 +1,16 @@
+<div class="detail-panel" data-role="detail-panel" style="width:300px;padding:1rem;border:1px solid #ccc;border-radius:4px">
+  <div style="display:flex;justify-content:space-between;margin-bottom:1rem">
+    <strong>Record #{{ selected_record.id }}</strong>
+    <button data-role="detail-close"
+            hx-get="{{ base_path }}/close-detail"
+            hx-target="#browser-content"
+            hx-swap="outerHTML"
+            hx-include="#browser-content input[type=hidden]">&times;</button>
+  </div>
+  <dl>
+    <dt>Name</dt><dd>{{ selected_record.name }}</dd>
+    <dt>Status</dt><dd><span class="badge badge-{{ selected_record.status }}">{{ selected_record.status }}</span></dd>
+    <dt>Created</dt><dd><span fx-format="date" fx-raw="{{ selected_record.createdDate }}" fx-cloak>{{ selected_record.createdDate }}</span></dd>
+    <dt>Value</dt><dd><span fx-format="currency" fx-raw="{{ selected_record.value }}" fx-currency="USD" fx-cloak>{{ selected_record.value }}</span></dd>
+  </dl>
+</div>

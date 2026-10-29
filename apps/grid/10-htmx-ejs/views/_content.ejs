@@ -1,0 +1,161 @@
+<div id="grid-content">
+  <input type="hidden" name="categoryFilter" value="<%= categoryFilter %>" />
+  <input type="hidden" name="page" value="<%= page %>" />
+  <input type="hidden" name="selected" value="<%= JSON.stringify(selectedIds) %>" />
+  <input type="hidden" name="bulkQuarter" value="<%= bulkQuarter %>" />
+  <input type="hidden" name="bulkValue" value="<%= bulkValue %>" />
+
+  <div class="toolbar">
+    <select
+      data-role="category-filter"
+      hx-get="<%= basePath %>/filter"
+      hx-trigger="change"
+      hx-target="#grid-content"
+      hx-swap="outerHTML"
+      hx-include="#grid-content input[type=hidden]"
+      name="cat"
+    >
+      <option value="All" <%= categoryFilter === 'All' ? 'selected' : '' %>>All Categories</option>
+      <% categories.forEach(function(c) { %>
+        <option value="<%= c %>" <%= categoryFilter === c ? 'selected' : '' %>><%= c %></option>
+      <% }) %>
+    </select>
+
+    <div class="bulk-fill">
+      <select data-role="bulk-quarter" onchange="this.closest('#grid-content').querySelector('input[name=bulkQuarter]').value=this.value">
+        <option value="q1" <%= bulkQuarter === 'q1' ? 'selected' : '' %>>Q1</option>
+        <option value="q2" <%= bulkQuarter === 'q2' ? 'selected' : '' %>>Q2</option>
+        <option value="q3" <%= bulkQuarter === 'q3' ? 'selected' : '' %>>Q3</option>
+        <option value="q4" <%= bulkQuarter === 'q4' ? 'selected' : '' %>>Q4</option>
+      </select>
+      <input
+        type="number"
+        step="0.01"
+        placeholder="Value"
+        data-role="bulk-value"
+        value="<%= bulkValue %>"
+        onchange="this.closest('#grid-content').querySelector('input[name=bulkValue]').value=this.value"
+        oninput="this.closest('#grid-content').querySelector('input[name=bulkValue]').value=this.value"
+      />
+      <button
+        data-role="bulk-fill"
+        <%= selCount === 0 ? 'disabled' : '' %>
+        hx-post="<%= basePath %>/bulk-fill"
+        hx-target="#grid-content"
+        hx-swap="outerHTML"
+        hx-include="#grid-content input[type=hidden]"
+      >Fill <%= selCount %> rows</button>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>
+          <input
+            type="checkbox"
+            data-role="select-all"
+            <%= allVisibleSelected ? 'checked' : '' %>
+            hx-post="<%= basePath %>/toggle-all"
+            hx-target="#grid-content"
+            hx-swap="outerHTML"
+            hx-include="#grid-content input[type=hidden]"
+          />
+        </th>
+        <th>Category</th>
+        <th>Description</th>
+        <th>Q1</th>
+        <th>Q2</th>
+        <th>Q3</th>
+        <th>Q4</th>
+        <th>Total</th>
+        <th>Budget Target</th>
+        <th>Variance</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach(function(row) { %>
+        <% var total = row.q1 + row.q2 + row.q3 + row.q4; %>
+        <% var variance = total - row.budgetTarget; %>
+        <tr data-row="<%= row.id %>" class="<%= selectedIds[row.id] ? 'selected' : '' %>">
+          <td>
+            <input
+              type="checkbox"
+              data-role="row-checkbox"
+              <%= selectedIds[row.id] ? 'checked' : '' %>
+              hx-post="<%= basePath %>/toggle?id=<%= row.id %>"
+              hx-target="#grid-content"
+              hx-swap="outerHTML"
+              hx-include="#grid-content input[type=hidden]"
+            />
+          </td>
+          <td><%= row.category %></td>
+          <td><%= row.description %></td>
+          <td data-cell="q1"
+            hx-get="<%= basePath %>/edit-cell?id=<%= row.id %>&col=q1"
+            hx-trigger="click"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-include="#grid-content input[type=hidden]"
+          ><%= fmt(row.q1) %></td>
+          <td data-cell="q2"
+            hx-get="<%= basePath %>/edit-cell?id=<%= row.id %>&col=q2"
+            hx-trigger="click"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-include="#grid-content input[type=hidden]"
+          ><%= fmt(row.q2) %></td>
+          <td data-cell="q3"
+            hx-get="<%= basePath %>/edit-cell?id=<%= row.id %>&col=q3"
+            hx-trigger="click"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-include="#grid-content input[type=hidden]"
+          ><%= fmt(row.q3) %></td>
+          <td data-cell="q4"
+            hx-get="<%= basePath %>/edit-cell?id=<%= row.id %>&col=q4"
+            hx-trigger="click"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-include="#grid-content input[type=hidden]"
+          ><%= fmt(row.q4) %></td>
+          <td><%= fmt(total) %></td>
+          <td><%= fmt(row.budgetTarget) %></td>
+          <td class="<%= variance < 0 ? 'over-budget' : 'under-budget' %>" data-role="variance"><%= fmt(variance) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+    <tfoot>
+      <tr data-role="totals-row">
+        <td colspan="3">Totals</td>
+        <td><%= fmt(totals.q1) %></td>
+        <td><%= fmt(totals.q2) %></td>
+        <td><%= fmt(totals.q3) %></td>
+        <td><%= fmt(totals.q4) %></td>
+        <td><%= fmt(totals.total) %></td>
+        <td><%= fmt(totals.budgetTarget) %></td>
+        <td class="<%= totals.variance < 0 ? 'over-budget' : 'under-budget' %>" data-role="variance"><%= fmt(totals.variance) %></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="pagination">
+    <button
+      data-action="prev-page"
+      <%= page <= 1 ? 'disabled' : '' %>
+      hx-get="<%= basePath %>/page?p=<%= page - 1 %>"
+      hx-target="#grid-content"
+      hx-swap="outerHTML"
+      hx-include="#grid-content input[type=hidden]"
+    >Previous</button>
+    <span class="page-info" data-role="page-info">Page <%= page %> of <%= totalPages %></span>
+    <button
+      data-action="next-page"
+      <%= page >= totalPages ? 'disabled' : '' %>
+      hx-get="<%= basePath %>/page?p=<%= page + 1 %>"
+      hx-target="#grid-content"
+      hx-swap="outerHTML"
+      hx-include="#grid-content input[type=hidden]"
+    >Next</button>
+  </div>
+</div>

@@ -1,0 +1,10 @@
+<input type="text"
+       name="editValue"
+       value="{{ value }}"
+       autofocus
+       hx-post="{{ base_path }}/commit-edit?id={{ id }}&col={{ col }}"
+       hx-trigger="keydown[key=='Enter']"
+       hx-target="#table-content"
+       hx-swap="outerHTML"
+       hx-include="#table-content"
+       style="width:100%;box-sizing:border-box">

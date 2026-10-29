@@ -1,0 +1,12 @@
+[project]
+name = "perf-benchmark-fastapi"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "jinja2>=3.1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = []

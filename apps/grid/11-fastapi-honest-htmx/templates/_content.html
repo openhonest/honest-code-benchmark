@@ -1,0 +1,154 @@
+<div id="grid-content"
+     data-category-filter="{{ category_filter }}"
+     data-page="{{ page }}"
+     data-selected='{{ selected_json }}'
+     data-bulk-quarter="{{ bulk_quarter }}"
+     data-bulk-value="{{ bulk_value }}">
+
+  <div class="toolbar">
+    <select name="cat"
+            hx-get="{{ base_path }}/filter"
+            hx-trigger="change"
+            hx-target="#grid-content"
+            hx-swap="outerHTML"
+            hx-vals='{"categoryFilter":"{{ category_filter }}","page":"{{ page }}","selected":"{{ selected_json }}","bulkQuarter":"{{ bulk_quarter }}","bulkValue":"{{ bulk_value }}"}'>
+      <option value="All" {% if category_filter == 'All' %}selected{% endif %}>All Categories</option>
+      {% for c in categories %}
+      <option value="{{ c }}" {% if category_filter == c %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+
+    <div class="bulk-fill">
+      <select data-role="bulk-quarter"
+              onchange="this.closest('#grid-content').dataset.bulkQuarter=this.value">
+        {% for q in ['q1', 'q2', 'q3', 'q4'] %}
+        <option value="{{ q }}" {% if bulk_quarter == q %}selected{% endif %}>{{ q | upper }}</option>
+        {% endfor %}
+      </select>
+      <input type="number"
+             step="0.01"
+             placeholder="Value"
+             value="{{ bulk_value }}"
+             onchange="this.closest('#grid-content').dataset.bulkValue=this.value"
+             oninput="this.closest('#grid-content').dataset.bulkValue=this.value">
+      <button {% if sel_count == 0 %}disabled{% endif %}
+              hx-post="{{ base_path }}/bulk-fill"
+              hx-target="#grid-content"
+              hx-swap="outerHTML"
+              hx-vals='{"categoryFilter":"{{ category_filter }}","page":"{{ page }}","selected":"{{ selected_json }}","bulkQuarter":"{{ bulk_quarter }}","bulkValue":"{{ bulk_value }}"}'>
+        Fill {{ sel_count }} rows
+      </button>
+    </div>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>
+          <input type="checkbox"
+                 {% if all_visible_selected %}checked{% endif %}
+                 hx-post="{{ base_path }}/toggle-all"
+                 hx-target="#grid-content"
+                 hx-swap="outerHTML"
+                 hx-vals='{"categoryFilter":"{{ category_filter }}","page":"{{ page }}","selected":"{{ selected_json }}","bulkQuarter":"{{ bulk_quarter }}","bulkValue":"{{ bulk_value }}"}'>
+        </th>
+        <th>Category</th>
+        <th>Description</th>
+        <th>Q1</th>
+        <th>Q2</th>
+        <th>Q3</th>
+        <th>Q4</th>
+        <th>Total</th>
+        <th>Budget Target</th>
+        <th>Variance</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      {% set total = row_total(row) %}
+      {% set variance = row_variance(row) %}
+      <tr data-row="{{ row.id }}" class="{% if row.id | string in selected_ids %}selected{% endif %}">
+        <td>
+          <input type="checkbox"
+                 {% if row.id | string in selected_ids %}checked{% endif %}
+                 hx-post="{{ base_path }}/toggle?id={{ row.id }}"
+                 hx-target="#grid-content"
+                 hx-swap="outerHTML"
+                 hx-vals='{"categoryFilter":"{{ category_filter }}","page":"{{ page }}","selected":"{{ selected_json }}","bulkQuarter":"{{ bulk_quarter }}","bulkValue":"{{ bulk_value }}"}'>
+        </td>
+        <td>{{ row.category }}</td>
+        <td>{{ row.description }}</td>
+        <td data-cell="q1"
+            hx-get="{{ base_path }}/edit-cell?id={{ row.id }}&col=q1"
+            hx-trigger="click"
+            hx-target="this"
+            hx-swap="outerHTML">
+          <span fx-format="number" fx-raw="{{ row.q1 }}" fx-decimals="2" fx-cloak>{{ fmt(row.q1) }}</span>
+        </td>
+        <td data-cell="q2"
+            hx-get="{{ base_path }}/edit-cell?id={{ row.id }}&col=q2"
+            hx-trigger="click"
+            hx-target="this"
+            hx-swap="outerHTML">
+          <span fx-format="number" fx-raw="{{ row.q2 }}" fx-decimals="2" fx-cloak>{{ fmt(row.q2) }}</span>
+        </td>
+        <td data-cell="q3"
+            hx-get="{{ base_path }}/edit-cell?id={{ row.id }}&col=q3"
+            hx-trigger="click"
+            hx-target="this"
+            hx-swap="outerHTML">
+          <span fx-format="number" fx-raw="{{ row.q3 }}" fx-decimals="2" fx-cloak>{{ fmt(row.q3) }}</span>
+        </td>
+        <td data-cell="q4"
+            hx-get="{{ base_path }}/edit-cell?id={{ row.id }}&col=q4"
+            hx-trigger="click"
+            hx-target="this"
+            hx-swap="outerHTML">
+          <span fx-format="number" fx-raw="{{ row.q4 }}" fx-decimals="2" fx-cloak>{{ fmt(row.q4) }}</span>
+        </td>
+        <td><span fx-format="number" fx-raw="{{ total }}" fx-decimals="2" fx-cloak>{{ fmt(total) }}</span></td>
+        <td><span fx-format="number" fx-raw="{{ row.budgetTarget }}" fx-decimals="2" fx-cloak>{{ fmt(row.budgetTarget) }}</span></td>
+        <td class="{% if variance < 0 %}over-budget{% else %}under-budget{% endif %}" data-role="variance">
+          <span fx-format="number" fx-raw="{{ variance }}" fx-decimals="2" fx-cloak>{{ fmt(variance) }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr data-role="totals-row">
+        <td colspan="3">Totals</td>
+        <td><span fx-format="number" fx-raw="{{ totals.q1 }}" fx-decimals="2" fx-cloak>{{ fmt(totals.q1) }}</span></td>
+        <td><span fx-format="number" fx-raw="{{ totals.q2 }}" fx-decimals="2" fx-cloak>{{ fmt(totals.q2) }}</span></td>
+        <td><span fx-format="number" fx-raw="{{ totals.q3 }}" fx-decimals="2" fx-cloak>{{ fmt(totals.q3) }}</span></td>
+        <td><span fx-format="number" fx-raw="{{ totals.q4 }}" fx-decimals="2" fx-cloak>{{ fmt(totals.q4) }}</span></td>
+        <td><span fx-format="number" fx-raw="{{ totals.total }}" fx-decimals="2" fx-cloak>{{ fmt(totals.total) }}</span></td>
+        <td><span fx-format="number" fx-raw="{{ totals.budgetTarget }}" fx-decimals="2" fx-cloak>{{ fmt(totals.budgetTarget) }}</span></td>
+        <td class="{% if totals.variance < 0 %}over-budget{% else %}under-budget{% endif %}" data-role="variance">
+          <span fx-format="number" fx-raw="{{ totals.variance }}" fx-decimals="2" fx-cloak>{{ fmt(totals.variance) }}</span>
+        </td>
+      </tr>
+    </tfoot>
+  </table>
+
+  {% if total_pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}
+    <button hx-get="{{ base_path }}/page?p={{ page - 1 }}"
+            hx-target="#grid-content"
+            hx-swap="outerHTML"
+            hx-vals='{"categoryFilter":"{{ category_filter }}","page":"{{ page }}","selected":"{{ selected_json }}","bulkQuarter":"{{ bulk_quarter }}","bulkValue":"{{ bulk_value }}"}'>
+      Previous
+    </button>
+    {% endif %}
+    <span class="page-info">Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <button hx-get="{{ base_path }}/page?p={{ page + 1 }}"
+            hx-target="#grid-content"
+            hx-swap="outerHTML"
+            hx-vals='{"categoryFilter":"{{ category_filter }}","page":"{{ page }}","selected":"{{ selected_json }}","bulkQuarter":"{{ bulk_quarter }}","bulkValue":"{{ bulk_value }}"}'>
+      Next
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>

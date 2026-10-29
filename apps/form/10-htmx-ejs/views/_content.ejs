@@ -1,0 +1,215 @@
+<div id="form-content">
+  <%/* Hidden inputs carry all form state across htmx swaps */%>
+  <input type="hidden" name="step" value="<%= step %>" />
+  <% for (const [key, val] of Object.entries(fields)) { %>
+    <input type="hidden" name="<%= key %>" value="<%- val %>" />
+  <% } %>
+  <input type="hidden" name="errors" value="<%- JSON.stringify(errors) %>" />
+
+  <div class="form-progress">
+    <% for (let s = 1; s <= 4; s++) { %>
+      <span class="step-dot<%= s === step ? ' active' : '' %><%= s < step ? ' done' : '' %>"><%= s %></span>
+    <% } %>
+  </div>
+
+  <% if (step === 1) { %>
+    <div class="form-step" data-step="1">
+      <h2>Contact Information</h2>
+
+      <div class="form-field<%= errors.firstName ? ' has-error' : '' %>">
+        <label>First Name *</label>
+        <input type="text" name="firstName" value="<%- fields.firstName %>" data-field="firstName"
+          hx-swap="none" />
+        <% if (errors.firstName) { %><span class="error" data-role="error">First Name is required</span><% } %>
+      </div>
+
+      <div class="form-field<%= errors.lastName ? ' has-error' : '' %>">
+        <label>Last Name *</label>
+        <input type="text" name="lastName" value="<%- fields.lastName %>" data-field="lastName"
+          hx-swap="none" />
+        <% if (errors.lastName) { %><span class="error" data-role="error">Last Name is required</span><% } %>
+      </div>
+
+      <div class="form-field<%= errors.email ? ' has-error' : '' %>">
+        <label>Email *</label>
+        <input type="email" name="email" value="<%- fields.email %>" data-field="email"
+          hx-swap="none" />
+        <% if (errors.email) { %><span class="error" data-role="error">Email is required</span><% } %>
+      </div>
+
+      <div class="form-field<%= errors.phone ? ' has-error' : '' %>">
+        <label>Phone *</label>
+        <input type="tel" name="phone" value="<%- fields.phone %>" data-field="phone"
+          hx-swap="none" />
+        <% if (errors.phone) { %><span class="error" data-role="error">Phone is required</span><% } %>
+      </div>
+
+      <div class="form-actions">
+        <button
+          data-role="next-step"
+          hx-post="<%= basePath %>/next"
+          hx-target="#form-content"
+          hx-swap="outerHTML"
+          hx-include="#form-content input"
+        >Next</button>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (step === 2) { %>
+    <div class="form-step" data-step="2">
+      <h2>Address</h2>
+
+      <div class="form-field<%= errors.street ? ' has-error' : '' %>">
+        <label>Street *</label>
+        <input type="text" name="street" value="<%- fields.street %>" data-field="street"
+          hx-swap="none" />
+        <% if (errors.street) { %><span class="error" data-role="error">Street is required</span><% } %>
+      </div>
+
+      <div class="form-field<%= errors.city ? ' has-error' : '' %>">
+        <label>City *</label>
+        <input type="text" name="city" value="<%- fields.city %>" data-field="city"
+          hx-swap="none" />
+        <% if (errors.city) { %><span class="error" data-role="error">City is required</span><% } %>
+      </div>
+
+      <div class="form-field<%= errors.state ? ' has-error' : '' %>">
+        <label>State *</label>
+        <select name="state" data-field="state" hx-swap="none">
+          <option value="">Select...</option>
+          <% usStates.forEach(function(st) { %>
+            <option value="<%= st %>" <%= fields.state === st ? 'selected' : '' %>><%= st %></option>
+          <% }) %>
+        </select>
+        <% if (errors.state) { %><span class="error" data-role="error">State is required</span><% } %>
+      </div>
+
+      <div class="form-field<%= errors.zip ? ' has-error' : '' %>">
+        <label>ZIP *</label>
+        <input type="text" name="zip" value="<%- fields.zip %>" data-field="zip"
+          hx-swap="none" />
+        <% if (errors.zip) { %><span class="error" data-role="error">ZIP is required</span><% } %>
+      </div>
+
+      <div class="form-field<%= errors.country ? ' has-error' : '' %>">
+        <label>Country *</label>
+        <select name="country" data-field="country" hx-swap="none">
+          <option value="">Select...</option>
+          <% countries.forEach(function(c) { %>
+            <option value="<%= c %>" <%= fields.country === c ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+        <% if (errors.country) { %><span class="error" data-role="error">Country is required</span><% } %>
+      </div>
+
+      <div class="form-actions">
+        <button
+          data-role="prev-step"
+          hx-post="<%= basePath %>/prev"
+          hx-target="#form-content"
+          hx-swap="outerHTML"
+          hx-include="#form-content input, #form-content select"
+        >Previous</button>
+        <button
+          data-role="next-step"
+          hx-post="<%= basePath %>/next"
+          hx-target="#form-content"
+          hx-swap="outerHTML"
+          hx-include="#form-content input, #form-content select"
+        >Next</button>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (step === 3) { %>
+    <div class="form-step" data-step="3">
+      <h2>Account Type</h2>
+
+      <div class="form-field">
+        <label>Account Type *</label>
+        <select name="accountType" data-role="account-type" data-field="accountType" hx-swap="none">
+          <option value="individual" <%= fields.accountType === 'individual' ? 'selected' : '' %>>Individual</option>
+          <option value="business" <%= fields.accountType === 'business' ? 'selected' : '' %>>Business</option>
+        </select>
+      </div>
+
+      <% if (fields.accountType === 'business') { %>
+        <div class="form-field<%= errors.companyName ? ' has-error' : '' %>">
+          <label>Company Name *</label>
+          <input type="text" name="companyName" value="<%- fields.companyName %>" data-field="companyName"
+            hx-swap="none" />
+          <% if (errors.companyName) { %><span class="error" data-role="error">Company Name is required</span><% } %>
+        </div>
+
+        <div class="form-field<%= errors.taxId ? ' has-error' : '' %>">
+          <label>Tax ID *</label>
+          <input type="text" name="taxId" value="<%- fields.taxId %>" data-field="taxId"
+            hx-swap="none" />
+          <% if (errors.taxId) { %><span class="error" data-role="error">Tax ID is required</span><% } %>
+        </div>
+
+        <div class="form-field">
+          <label>PO Number</label>
+          <input type="text" name="poNumber" value="<%- fields.poNumber %>" data-field="poNumber"
+            hx-swap="none" />
+        </div>
+      <% } %>
+
+      <div class="form-actions">
+        <button
+          data-role="prev-step"
+          hx-post="<%= basePath %>/prev"
+          hx-target="#form-content"
+          hx-swap="outerHTML"
+          hx-include="#form-content input, #form-content select"
+        >Previous</button>
+        <button
+          data-role="next-step"
+          hx-post="<%= basePath %>/next"
+          hx-target="#form-content"
+          hx-swap="outerHTML"
+          hx-include="#form-content input, #form-content select"
+        >Next</button>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (step === 4) { %>
+    <div class="form-step" data-step="4">
+      <h2>Review</h2>
+      <dl class="review-list">
+        <dt>Name</dt><dd><%= fields.firstName %> <%= fields.lastName %></dd>
+        <dt>Email</dt><dd><%= fields.email %></dd>
+        <dt>Phone</dt><dd><%= fields.phone %></dd>
+        <dt>Address</dt><dd><%= fields.street %>, <%= fields.city %>, <%= fields.state %> <%= fields.zip %></dd>
+        <dt>Country</dt><dd><%= fields.country %></dd>
+        <dt>Account Type</dt><dd><%= fields.accountType %></dd>
+        <% if (fields.accountType === 'business') { %>
+          <dt>Company</dt><dd><%= fields.companyName %></dd>
+          <dt>Tax ID</dt><dd><%= fields.taxId %></dd>
+          <% if (fields.poNumber) { %>
+            <dt>PO Number</dt><dd><%= fields.poNumber %></dd>
+          <% } %>
+        <% } %>
+      </dl>
+      <div class="form-actions">
+        <button
+          data-role="prev-step"
+          hx-post="<%= basePath %>/prev"
+          hx-target="#form-content"
+          hx-swap="outerHTML"
+          hx-include="#form-content input"
+        >Previous</button>
+        <button
+          class="primary"
+          data-role="submit"
+          hx-post="<%= basePath %>/submit"
+          hx-target="#form-content"
+          hx-swap="outerHTML"
+          hx-include="#form-content input"
+        >Submit</button>
+      </div>
+    </div>
+  <% } %>
+</div>
