@@ -1,8 +1,8 @@
-# Research plan: empirical arm for DATAOS
+# Research plan: benchmarking alternatives to conventional web application design
 
 Oct 24, 2026 · @Adam Wasserman
 
-An outline for the empirical work that would support the DATAOS, domx, genX, and stateless claims. Every choice below answers one objection: that the architecture was benchmarked by its own author.
+An outline for an empirical study comparing alternatives to conventional web application design. The study measures performance differences across client-side state management, server-side code structure, and rendering mode. Every design choice below answers one objection: that the architecture was benchmarked by its own author.
 
 ## Separate the claims by instrument
 

@@ -1,4 +1,4 @@
-# OSF preregistration: hydration cost as a function of client-side state
+# OSF preregistration: benchmarking alternatives to conventional web application design
 
 Draft for submission to the OSF Registries. Adapt to the OSF Standard Pre-Data Collection Registration template before submitting.
 
@@ -6,7 +6,7 @@ Draft for submission to the OSF Registries. Adapt to the OSF Standard Pre-Data C
 
 ### Title
 
-Hydration cost as a function of client-side state layer: a controlled benchmark of DOM-as-state versus managed state in React applications
+Benchmarking alternatives to conventional web application design: DOM-as-state, functional server components, and server-rendered HTML in a controlled factorial experiment
 
 ### Authors
 
