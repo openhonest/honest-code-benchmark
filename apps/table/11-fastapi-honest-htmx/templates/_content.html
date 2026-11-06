@@ -1,83 +1,93 @@
-<div id="table-content"
-     data-sort-col="{{ sort_col }}"
-     data-sort-dir="{{ sort_dir }}"
-     data-filter="{{ filter_text }}"
-     data-page="{{ page }}"
-     data-selected='{{ selected_json }}'>
+{#- Request state travels in the hidden inputs below; every hx request includes
+    them with hx-include. No state is embedded in hx-vals, so Jinja's
+    attribute escaping cannot corrupt it. -#}
+{%- set inc = "#table-content input[type=hidden]" -%}
+<div id="table-content">
+  <input type="hidden" name="sortCol" value="{{ sort_col }}">
+  <input type="hidden" name="sortDir" value="{{ sort_dir }}">
+  <input type="hidden" name="filter" value="{{ filter_text }}">
+  <input type="hidden" name="page" value="{{ page }}">
+  <input type="hidden" name="selected" value="{{ selected_json }}">
 
-  <div class="table-toolbar">
+  <div class="filter-bar">
     <input type="text"
            name="filterInput"
+           placeholder="Filter by name, email, or department..."
            value="{{ filter_text }}"
-           placeholder="Filter rows..."
+           data-role="filter-input"
            hx-get="{{ base_path }}/filter"
-           hx-trigger="keyup changed delay:300ms"
+           hx-trigger="input changed delay:300ms"
            hx-target="#table-content"
            hx-swap="outerHTML"
-           hx-include="#table-content"
-           hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","page":"1","selected":"{{ selected_json }}"}'>
-
-    {% if sel_count > 0 %}
-    <button hx-post="{{ base_path }}/delete"
-            hx-target="#table-content"
-            hx-swap="outerHTML"
-            hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","page":"{{ page }}","selected":"{{ selected_json }}"}'>
-      Delete {{ sel_count }} selected
-    </button>
-    {% endif %}
-
-    <span class="row-count">{{ total_rows }} rows</span>
+           hx-include="{{ inc }}">
   </div>
 
-  <table class="data-table">
+  <div class="toolbar">
+    <span class="selection-count">{{ sel_count }} of {{ total_rows }} selected</span>
+    <button class="danger"
+            data-action="delete-selected"
+            {% if sel_count == 0 %}disabled{% endif %}
+            hx-post="{{ base_path }}/delete"
+            hx-target="#table-content"
+            hx-swap="outerHTML"
+            hx-include="{{ inc }}">Delete selected</button>
+  </div>
+
+  <table>
     <thead>
       <tr>
         <th>
           <input type="checkbox"
+                 data-role="select-all"
                  {% if all_visible_selected %}checked{% endif %}
-                 hx-post="{{ base_path }}/toggle-all"
+                 data-replay hx-post="{{ base_path }}/toggle-all"
                  hx-target="#table-content"
                  hx-swap="outerHTML"
-                 hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","page":"{{ page }}","selected":"{{ selected_json }}"}'>
+                 hx-include="{{ inc }}">
         </th>
         {% for col in columns %}
-        <th hx-get="{{ base_path }}/sort?col={{ col.key }}"
+        <th data-column="{{ col.key }}"
+            hx-get="{{ base_path }}/sort?col={{ col.key }}"
             hx-target="#table-content"
             hx-swap="outerHTML"
-            hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","page":"{{ page }}","selected":"{{ selected_json }}"}'
+            hx-include="{{ inc }}"
             style="cursor:pointer">
           {{ col.label }}
-          {% if sort_col == col.key %}
-            {% if sort_dir == 'asc' %} ▲{% else %} ▼{% endif %}
-          {% endif %}
+          <span class="sort-indicator{% if sort_col == col.key %} active{% endif %}">
+            {%- if sort_col != col.key %}↕{% elif sort_dir == 'asc' %}↑{% else %}↓{% endif -%}
+          </span>
         </th>
         {% endfor %}
       </tr>
     </thead>
     <tbody>
       {% for row in rows %}
-      <tr>
+      <tr data-row="{{ row.id }}" class="{% if row.id in selected_ids %}selected{% endif %}">
         <td>
           <input type="checkbox"
+                 data-role="row-checkbox"
                  {% if row.id in selected_ids %}checked{% endif %}
-                 hx-post="{{ base_path }}/toggle?id={{ row.id }}"
+                 data-replay hx-post="{{ base_path }}/toggle?id={{ row.id }}"
                  hx-target="#table-content"
                  hx-swap="outerHTML"
-                 hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","page":"{{ page }}","selected":"{{ selected_json }}"}'>
+                 hx-include="{{ inc }}">
         </td>
         {% for col in columns %}
-        <td hx-get="{{ base_path }}/edit-cell?id={{ row.id }}&col={{ col.key }}"
+        <td data-column="{{ col.key }}"
+            {% if col.key in editable %}
+            hx-get="{{ base_path }}/edit-cell?id={{ row.id }}&col={{ col.key }}"
             hx-trigger="dblclick"
-            hx-swap="innerHTML">
-          {% if col.key == 'salary' %}
-          <span fx-format="currency" fx-raw="{{ row[col.key] }}" fx-currency="USD" fx-cloak>{{ row[col.key] }}</span>
-          {% elif col.key == 'hireDate' %}
-          <span fx-format="date" fx-raw="{{ row[col.key] }}" fx-cloak>{{ row[col.key] }}</span>
-          {% elif col.key == 'active' %}
-          {{ 'Yes' if row[col.key] else 'No' }}
-          {% else %}
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-include="{{ inc }}"
+            {% endif %}>
+          {%- if col.key == 'salary' -%}
+          <span fx-format="currency" fx-raw="{{ row.salary }}" fx-currency="USD" fx-decimals="0">{{ usd(row.salary) }}</span>
+          {%- elif col.key == 'active' -%}
+          {{ 'Yes' if row.active else 'No' }}
+          {%- else -%}
           {{ row[col.key] }}
-          {% endif %}
+          {%- endif -%}
         </td>
         {% endfor %}
       </tr>
@@ -85,25 +95,19 @@
     </tbody>
   </table>
 
-  {% if total_pages > 1 %}
   <div class="pagination">
-    {% if page > 1 %}
-    <button hx-get="{{ base_path }}/page?p={{ page - 1 }}"
+    <button data-action="prev-page"
+            {% if page <= 1 %}disabled{% endif %}
+            hx-get="{{ base_path }}/page?p={{ page - 1 }}"
             hx-target="#table-content"
             hx-swap="outerHTML"
-            hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","selected":"{{ selected_json }}"}'>
-      Previous
-    </button>
-    {% endif %}
-    <span>Page {{ page }} of {{ total_pages }}</span>
-    {% if page < total_pages %}
-    <button hx-get="{{ base_path }}/page?p={{ page + 1 }}"
+            hx-include="{{ inc }}">Previous</button>
+    <span class="page-info" data-role="page-info">Page {{ page }} of {{ total_pages }}</span>
+    <button data-action="next-page"
+            {% if page >= total_pages %}disabled{% endif %}
+            hx-get="{{ base_path }}/page?p={{ page + 1 }}"
             hx-target="#table-content"
             hx-swap="outerHTML"
-            hx-vals='{"sortCol":"{{ sort_col }}","sortDir":"{{ sort_dir }}","filter":"{{ filter_text }}","selected":"{{ selected_json }}"}'>
-      Next
-    </button>
-    {% endif %}
+            hx-include="{{ inc }}">Next</button>
   </div>
-  {% endif %}
 </div>

@@ -13,6 +13,6 @@
     <dt>Name</dt><dd><%= record.name %></dd>
     <dt>Status</dt><dd><span class="badge badge-<%= record.status %>"><%= record.status %></span></dd>
     <dt>Created</dt><dd><%= record.createdDate %></dd>
-    <dt>Value</dt><dd>$<%= record.value.toLocaleString() %></dd>
+    <dt>Value</dt><dd>$<%= record.value.toLocaleString('en-US') %></dd>
   </dl>
 </div>

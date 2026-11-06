@@ -5,11 +5,22 @@
   "scripts": {
     "build": "node build.js",
     "build:table": "node build.js table",
-    "serve": "node server.js"
+    "serve": "node server.js",
+    "test": "node --test tests/ && .venv/bin/python -m unittest discover -s tests",
+    "check:parity": "node scripts/check-ssr-parity.mjs",
+    "check:hydration": "node scripts/check-hydration.mjs",
+    "check:row-order": "node scripts/check-row-order.mjs",
+    "check:refresh": "node scripts/check-refresh.mjs",
+    "check:reload": "node scripts/check-reload-replay.mjs"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
     "@preact/signals-react": "^2.2.0",
     "@reduxjs/toolkit": "^2.2.7",
+    "better-sqlite3": "^13.0.3",
+    "compression": "^1.8.2",
     "domx-dataos": "^0.1.0",
     "ejs": "^7.0.2",
     "esbuild": "^0.24.0",

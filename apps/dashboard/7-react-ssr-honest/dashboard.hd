@@ -73,7 +73,9 @@ module dashboard_ssr_honest
     note "compute total orders, revenue, average order value and unique customers"
   fn format_currency : (value: float) -> str
     note "format a number as USD currency with two decimal places"
+  fn format_updated : (iso: str) -> str
+    note "format an ISO timestamp as HH:MM:SS UTC for the last-updated line, or empty when absent"
   fn compare_string : (a: str, b: str) -> int
-    note "locale-aware string comparison returning -1, 0 or 1"
+    note "ASCII lower-case string comparison (SQLite NOCASE order) returning -1, 0 or 1"
   fn compare_number : (a: float, b: float) -> int
     note "numeric comparison returning -1, 0 or 1"

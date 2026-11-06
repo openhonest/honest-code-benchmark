@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
-import { useDomState, apply } from 'stateless-dataos';
+import { useDomState, apply, collect } from 'stateless-dataos';
 
 const COUNTRIES = ['US','CA','MX','GB','DE','FR','JP','AU','BR','IN'];
 const US_STATES = [
@@ -35,6 +35,17 @@ const EMPTY_FIELDS = {
   accountType: 'individual', companyName: '', taxId: '', poNumber: '',
 };
 
+// Read the current state back from the DOM before writing. The render-time
+// copy can be stale when a second input event arrives before React has
+// re-rendered from the first.
+function updateField(name, value) {
+  const current = collect(stateManifest);
+  const next = { ...parseJSON(current.fields, EMPTY_FIELDS), [name]: value };
+  const errs = { ...parseJSON(current.errors, {}) };
+  delete errs[name];
+  writeState({ fields: JSON.stringify(next), errors: JSON.stringify(errs) });
+}
+
 function Field({ label, name, fields, errors, type = 'text' }) {
   const hasError = errors[name];
   return (
@@ -43,12 +54,7 @@ function Field({ label, name, fields, errors, type = 'text' }) {
       <input
         type={type}
         value={fields[name]}
-        onChange={e => {
-          const next = { ...fields, [name]: e.target.value };
-          const errs = { ...errors };
-          if (errs[name]) delete errs[name];
-          writeState({ fields: JSON.stringify(next), errors: JSON.stringify(errs) });
-        }}
+        onChange={e => updateField(name, e.target.value)}
         data-field={name}
       />
       {hasError && <span className="error" data-role="error">{label} is required</span>}
@@ -63,12 +69,7 @@ function SelectField({ label, name, options, fields, errors }) {
       <label>{label} *</label>
       <select
         value={fields[name]}
-        onChange={e => {
-          const next = { ...fields, [name]: e.target.value };
-          const errs = { ...errors };
-          if (errs[name]) delete errs[name];
-          writeState({ fields: JSON.stringify(next), errors: JSON.stringify(errs) });
-        }}
+        onChange={e => updateField(name, e.target.value)}
         data-field={name}
       >
         <option value="">Select...</option>
@@ -195,10 +196,7 @@ export default function App() {
             <label>Account Type *</label>
             <select
               value={fields.accountType}
-              onChange={e => {
-                const next = { ...fields, accountType: e.target.value };
-                writeState({ fields: JSON.stringify(next) });
-              }}
+              onChange={e => updateField('accountType', e.target.value)}
               data-role="account-type"
               data-field="accountType"
             >

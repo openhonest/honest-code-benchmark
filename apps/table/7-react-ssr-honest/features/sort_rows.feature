@@ -1,5 +1,5 @@
 Feature: sort_rows
-  Sort rows by the given column using the dispatch table.
+  Sort rows by the given column using the dispatch table. Ties break on ascending id.
 
   Scenario: sort by string column ascending
     Given rows with names "Charlie", "Alice", "Bob"
@@ -19,9 +19,14 @@ Feature: sort_rows
   Scenario: sort by boolean column ascending
     Given rows with active values false, true, false
     When I sort by "active" direction "asc"
-    Then active values are ordered false, false, true
+    Then active values are ordered true, false, false
 
   Scenario: sort dispatches through sort_comparators
     Given the sort_comparators table
     When I look up "string"
     Then it returns compare_string
+
+  Scenario: ties break on ascending id in both directions
+    Given rows 3 "alice", 1 "Alice", 2 "ALICE"
+    When I sort by "name" direction "desc"
+    Then the ids are ordered 1, 2, 3

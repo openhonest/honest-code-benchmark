@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Benchmark: <%= archetype %> / <%= arm %></title>
+  <link rel="stylesheet" href="/shared/styles.css">
+  <script src="/htmx/htmx.min.js"></script>
+  <script src="/lib/htmx-replay.js" defer></script>
+</head>
+<body>
+  <div id="root">
+    <div class="app" hx-sync="this:replace">
+      <%- include('./_content.ejs', { rows: pageRows, columns, totalRows, sortCol, sortDir, category, status, dateFrom, dateTo, page, totalPages, metrics, categories, statuses, basePath, loadedAt, updatedText }) %>
+      <div hidden data-role="refresh-poller"
+        hx-sync="closest .app:drop"
+        hx-get="<%= basePath %>/refresh"
+        hx-trigger="<%= refreshTrigger %>"
+        hx-target="#dashboard-content"
+        hx-swap="outerHTML"
+        hx-include="#dashboard-content input[type=hidden]"></div>
+    </div>
+  </div>
+  <script>
+    window.__BENCHMARK_CONFIG__ = { archetype: "<%= archetype %>", arm: "<%= arm %>", rows: <%= dataRows %>, refreshSeconds: <%= refreshSeconds %> };
+  </script>
+</body>
+</html>

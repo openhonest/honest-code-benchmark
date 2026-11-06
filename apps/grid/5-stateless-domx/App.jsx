@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
 import { useDomState, apply } from 'stateless-dataos';
+import { parseMoney } from '../../lib/value-rules.js';
 
 const ROWS_PER_PAGE = 25;
 
@@ -30,8 +31,8 @@ function EditableCell({ row, field, editingCell, editingValue }) {
           onChange={e => writeState({ editValue: e.target.value })}
           onKeyDown={e => {
             if (e.key === 'Enter') {
-              const num = parseFloat(editingValue);
-              if (!isNaN(num)) {
+              const num = parseMoney(editingValue);
+              if (num !== null) {
                 const target = rowData.find(r => r.id === editingCell.id);
                 if (target) target[editingCell.field] = num;
               }
@@ -107,8 +108,8 @@ export default function App() {
   }, [pageRows, selectedIds]);
 
   const handleBulkFill = useCallback(() => {
-    const num = parseFloat(bv);
-    if (isNaN(num) || selCount === 0) return;
+    const num = parseMoney(bv);
+    if (num === null || selCount === 0) return;
     for (const r of rowData) {
       if (selectedIds[r.id]) r[bq] = num;
     }

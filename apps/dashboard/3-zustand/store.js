@@ -11,8 +11,11 @@ export const useDashboardStore = create((set, get) => ({
   sortColumn: null,
   sortDirection: null,
   currentPage: 1,
+  lastUpdated: '',
 
-  setData: (rows) => set({ data: rows, currentPage: 1 }),
+  // A load or refresh replaces the rows and the timestamp; filters, sort
+  // and page stay as the user left them.
+  setData: (rows) => set({ data: rows, lastUpdated: new Date().toISOString() }),
   setCategoryFilter: (v) => set({ categoryFilter: v, currentPage: 1 }),
   setStatusFilter: (v) => set({ statusFilter: v, currentPage: 1 }),
   setDateFrom: (v) => set({ dateFrom: v, currentPage: 1 }),
@@ -40,10 +43,17 @@ export const useDashboardStore = create((set, get) => ({
     const s = get();
     const filtered = get().getFiltered();
     if (!s.sortColumn || !s.sortDirection) return filtered;
+    const sign = s.sortDirection === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => {
       const av = a[s.sortColumn], bv = b[s.sortColumn];
-      let cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
-      return s.sortDirection === 'desc' ? -cmp : cmp;
+      let cmp = 0;
+      if (typeof av === 'string') {
+        const al = av.toLowerCase(), bl = bv.toLowerCase();
+        cmp = al < bl ? -1 : al > bl ? 1 : 0;
+      } else {
+        cmp = av - bv;
+      }
+      return cmp !== 0 ? sign * cmp : (a.id < b.id ? -1 : 1);
     });
   },
 }));

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { parseMoney } from '../../lib/value-rules.js';
 
 const ROWS_PER_PAGE = 25;
 
@@ -34,8 +35,8 @@ export const useGridStore = create((set, get) => ({
   commitEdit: () => set(s => {
     if (!s.editingCell) return {};
     const { id, field } = s.editingCell;
-    const num = parseFloat(s.editingValue);
-    if (isNaN(num)) return { editingCell: null, editingValue: '' };
+    const num = parseMoney(s.editingValue);
+    if (num === null) return { editingCell: null, editingValue: '' };
     return {
       data: s.data.map(r => r.id === id ? { ...r, [field]: num } : r),
       editingCell: null, editingValue: '',
@@ -46,8 +47,8 @@ export const useGridStore = create((set, get) => ({
   setBulkQuarter: (v) => set({ bulkQuarter: v }),
   setBulkValue: (v) => set({ bulkValue: v }),
   bulkFill: () => set(s => {
-    const num = parseFloat(s.bulkValue);
-    if (isNaN(num)) return {};
+    const num = parseMoney(s.bulkValue);
+    if (num === null) return {};
     const q = s.bulkQuarter;
     return { data: s.data.map(r => s.selectedIds[r.id] ? { ...r, [q]: num } : r) };
   }),

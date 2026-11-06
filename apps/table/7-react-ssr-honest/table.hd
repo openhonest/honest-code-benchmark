@@ -60,15 +60,15 @@ module table_ssr_honest
   fn filter_rows : (rows: list<Row>, text: str) -> list<Row>
     note "keep rows whose name, email or department contains the text"
   fn sort_rows : (rows: list<Row>, col: ColumnKey, dir: SortDir) -> list<Row>
-    note "sort rows by the given column using the dispatch table"
+    note "sort rows by the given column using the dispatch table; ties break on ascending id"
     invokes sort_comparators
   fn paginate : (rows: list<Row>, page: int, perPage: int) -> PageResult
     note "slice the rows for the requested page and compute totals"
   fn compare_string : (a: str, b: str) -> int
-    note "locale-aware string comparison returning -1, 0 or 1"
+    note "ASCII lower-case string comparison (SQLite NOCASE order) returning -1, 0 or 1"
   fn compare_number : (a: int, b: int) -> int
     note "numeric comparison returning -1, 0 or 1"
   fn compare_boolean : (a: bool, b: bool) -> int
-    note "boolean comparison with false before true"
+    note "boolean comparison with true before false"
   fn format_cell : (column: ColumnKey, value: str | int | bool) -> str
     note "format a cell value for display based on column type"

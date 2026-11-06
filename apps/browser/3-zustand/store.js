@@ -35,10 +35,17 @@ export const useBrowserStore = create((set, get) => ({
       rows = rows.filter(r => r.status === s.statusFilter);
     }
     if (s.sortColumn && s.sortDirection) {
+      const sign = s.sortDirection === 'desc' ? -1 : 1;
       rows = [...rows].sort((a, b) => {
         const av = a[s.sortColumn], bv = b[s.sortColumn];
-        let cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
-        return s.sortDirection === 'desc' ? -cmp : cmp;
+        let cmp = 0;
+        if (typeof av === 'string') {
+          const al = av.toLowerCase(), bl = bv.toLowerCase();
+          cmp = al < bl ? -1 : al > bl ? 1 : 0;
+        } else {
+          cmp = av - bv;
+        }
+        return cmp !== 0 ? sign * cmp : (a.id < b.id ? -1 : 1);
       });
     }
     return rows;

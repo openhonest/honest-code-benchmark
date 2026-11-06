@@ -29,7 +29,15 @@ describe('sort_rows', () => {
   it('sorts by boolean column ascending', () => {
     const rows = [row(1, 'A', 50000, false), row(2, 'B', 50000, true), row(3, 'C', 50000, false)];
     const result = sort_rows(rows, 'active', 'asc');
-    deepStrictEqual(result.map(r => r.active), [false, false, true]);
+    deepStrictEqual(result.map(r => r.active), [true, false, false]);
+  });
+});
+
+describe('sort_rows tie-break', () => {
+  it('breaks ties on ascending id in both directions', () => {
+    const rows = [row(3, 'alice', 1, true), row(1, 'Alice', 1, true), row(2, 'ALICE', 1, true)];
+    deepStrictEqual(sort_rows(rows, 'name', 'asc').map(r => r.id), [1, 2, 3]);
+    deepStrictEqual(sort_rows(rows, 'name', 'desc').map(r => r.id), [1, 2, 3]);
   });
 });
 

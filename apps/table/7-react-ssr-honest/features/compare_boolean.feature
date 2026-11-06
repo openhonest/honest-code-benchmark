@@ -1,5 +1,5 @@
 Feature: compare_boolean
-  Boolean comparison with false before true.
+  Boolean comparison with true before false.
 
   Scenario: both false returns 0
     Given booleans false and false
@@ -11,12 +11,12 @@ Feature: compare_boolean
     When I compare them
     Then the result is 0
 
-  Scenario: false before true returns negative
+  Scenario: false after true returns positive
     Given booleans false and true
     When I compare them
-    Then the result is -1
+    Then the result is 1
 
-  Scenario: true before false returns positive
+  Scenario: true before false returns negative
     Given booleans true and false
     When I compare them
-    Then the result is 1
+    Then the result is -1

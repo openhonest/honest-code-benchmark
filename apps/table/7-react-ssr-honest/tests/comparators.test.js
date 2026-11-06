@@ -43,11 +43,20 @@ describe('compare_boolean', () => {
     strictEqual(compare_boolean(true, true), 0);
   });
 
-  it('returns -1 for false before true', () => {
-    strictEqual(compare_boolean(false, true), -1);
+  it('returns 1 for false after true', () => {
+    strictEqual(compare_boolean(false, true), 1);
   });
 
-  it('returns 1 for true before false', () => {
-    strictEqual(compare_boolean(true, false), 1);
+  it('returns -1 for true before false', () => {
+    strictEqual(compare_boolean(true, false), -1);
+  });
+});
+
+describe('compare_string uses ASCII order, not locale order', () => {
+  it('puts "_" (0x5F) before lower-case letters, as SQLite NOCASE does', () => {
+    strictEqual(compare_string('a_b@x.com', 'ab@x.com'), -1);
+  });
+  it('puts "." before letters', () => {
+    strictEqual(compare_string('a.b@x.com', 'ab@x.com'), -1);
   });
 });

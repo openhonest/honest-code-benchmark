@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useServerPage, postJSON } from '../../lib/arm6-client.js';
 
 const COLUMNS = [
   { key: 'name', label: 'Name' },
@@ -9,8 +10,6 @@ const COLUMNS = [
   { key: 'active', label: 'Active' },
 ];
 
-const ROWS_PER_PAGE = 25;
-
 let domxModule = null;
 const stateManifest = {
   sortCol:   { selector: '#table-state', read: 'data:sortCol',   write: 'data:sortCol' },
@@ -20,6 +19,7 @@ const stateManifest = {
   selected:  { selector: '#table-state', read: 'data:selected',  write: 'data:selected' },
   editing:   { selector: '#table-state', read: 'data:editing',   write: 'data:editing' },
   editValue: { selector: '#table-state', read: 'data:editValue', write: 'data:editValue' },
+  version:   { selector: '#table-state', read: 'data:version',   write: 'data:version' },
 };
 
 function writeState(updates) {
@@ -70,15 +70,11 @@ function EditableCell({ row, column, editingCell, editingValue }) {
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
-      if (editingCell) {
-        const target = rowData.find(r => r.id === editingCell.id);
-        if (target) {
-          target[editingCell.column] = editingCell.column === 'salary'
-            ? parseInt(editingValue, 10) || target[editingCell.column]
-            : editingValue;
-        }
-      }
-      writeState({ editing: '', editValue: '' });
+      if (!editingCell) return;
+      // The server applies the salary rule and answers 400 on bad input;
+      // either way the edit closes and the page reloads from SQLite.
+      postJSON('edit', { id: editingCell.id, column: editingCell.column, value: editingValue })
+        .finally(() => writeState({ editing: '', editValue: '', version: String(Date.now()) }));
     } else if (e.key === 'Escape') {
       writeState({ editing: '', editValue: '' });
     }
@@ -99,7 +95,7 @@ function EditableCell({ row, column, editingCell, editingValue }) {
   }
 
   const value = column === 'salary'
-    ? `$${row[column].toLocaleString()}`
+    ? `$${row[column].toLocaleString('en-US')}`
     : column === 'active'
       ? (row[column] ? 'Yes' : 'No')
       : String(row[column]);
@@ -109,66 +105,32 @@ function EditableCell({ row, column, editingCell, editingValue }) {
   );
 }
 
-let rowData = [];
+const INITIAL_QUERY = { q: '', col: '', dir: '', page: '1', v: '' };
 
-export default function App({ initialData }) {
+export default function App({ initialPage }) {
   const { domState, ready } = useDomStateSSR(stateManifest);
   const filterTimeout = useRef(null);
-  const hydrated = useRef(false);
-
-  if (initialData && !hydrated.current) {
-    rowData = initialData;
-    hydrated.current = true;
-  }
 
   const sortCol = ready ? (domState.sortCol || null) : null;
   const sortDir = ready ? (domState.sortDir || null) : null;
   const filterText = ready ? (domState.filter || '') : '';
-  const currentPage = ready ? (parseInt(domState.page, 10) || 1) : 1;
+  const requestedPage = ready ? (parseInt(domState.page, 10) || 1) : 1;
   const selectedIds = ready ? parseJSON(domState.selected, {}) : {};
   const editingCell = ready ? parseJSON(domState.editing, null) : null;
   const editingValue = ready ? (domState.editValue || '') : '';
+  const version = ready ? (domState.version || '') : '';
+
+  const pageData = useServerPage(initialPage, {
+    q: filterText, col: sortCol || '', dir: sortDir || '', page: String(requestedPage), v: version,
+  }, INITIAL_QUERY);
 
   useEffect(() => {
-    if (!initialData && typeof window !== 'undefined') {
-      const config = window.__BENCHMARK_CONFIG__;
-      fetch(config.dataUrl)
-        .then(r => r.json())
-        .then(data => { rowData = data; });
-    }
-  }, [initialData]);
-
-  useEffect(() => {
-    if (ready && rowData.length > 0) {
-      writeState({ page: '1', selected: '{}' });
-    }
+    if (ready) writeState({ page: '1', selected: '{}' });
   }, [ready]);
 
-  const filteredSorted = useMemo(() => {
-    let rows = rowData;
-    if (filterText) {
-      const ft = filterText.toLowerCase();
-      rows = rows.filter(r =>
-        r.name.toLowerCase().includes(ft) ||
-        r.email.toLowerCase().includes(ft) ||
-        r.department.toLowerCase().includes(ft)
-      );
-    }
-    if (sortCol && sortDir) {
-      rows = [...rows].sort((a, b) => {
-        const av = a[sortCol], bv = b[sortCol];
-        let cmp = 0;
-        if (typeof av === 'string') cmp = av.localeCompare(bv);
-        else if (typeof av === 'boolean') cmp = av === bv ? 0 : av ? -1 : 1;
-        else cmp = av - bv;
-        return sortDir === 'desc' ? -cmp : cmp;
-      });
-    }
-    return rows;
-  }, [filterText, sortCol, sortDir, rowData.length]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredSorted.length / ROWS_PER_PAGE));
-  const pageRows = filteredSorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
+  const pageRows = pageData.rows;
+  const currentPage = pageData.page;
+  const totalPages = pageData.totalPages;
 
   const handleSort = useCallback((col) => {
     if (sortCol === col) {
@@ -207,19 +169,17 @@ export default function App({ initialData }) {
   }, [pageRows, selectedIds]);
 
   const handleDelete = useCallback(() => {
-    rowData = rowData.filter(r => !selectedIds[r.id]);
-    const tp = Math.max(1, Math.ceil(rowData.length / ROWS_PER_PAGE));
-    writeState({
-      selected: '{}',
-      page: String(currentPage > tp ? tp : currentPage),
-    });
-  }, [selectedIds, currentPage]);
+    const ids = Object.keys(selectedIds).map(Number);
+    // The server clamps the page when the delete removes the last one.
+    postJSON('delete', { ids })
+      .finally(() => writeState({ selected: '{}', version: String(Date.now()) }));
+  }, [selectedIds]);
 
   return (
     <div className="app">
       <div id="table-state"
         data-sort-col="" data-sort-dir="" data-filter=""
-        data-page="1" data-selected="{}" data-editing="" data-edit-value=""
+        data-page="1" data-selected="{}" data-editing="" data-edit-value="" data-version=""
         style={{ display: 'none' }}
       />
 
@@ -234,7 +194,7 @@ export default function App({ initialData }) {
 
       <div className="toolbar">
         <span className="selection-count">
-          {selCount} of {filteredSorted.length} selected
+          {selCount} of {pageData.total} selected
         </span>
         <button
           className="danger"

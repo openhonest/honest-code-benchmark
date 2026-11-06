@@ -13,7 +13,7 @@
       value="<%= filter %>"
       data-role="filter-input"
       hx-get="<%= basePath %>/filter"
-      hx-trigger="keyup changed delay:300ms"
+      hx-trigger="input changed delay:300ms"
       hx-target="#table-content"
       hx-swap="outerHTML"
       hx-include="#table-content input[type=hidden]"
@@ -41,7 +41,7 @@
             type="checkbox"
             data-role="select-all"
             <%= allVisibleSelected ? 'checked' : '' %>
-            hx-post="<%= basePath %>/toggle-all"
+            data-replay hx-post="<%= basePath %>/toggle-all"
             hx-target="#table-content"
             hx-swap="outerHTML"
             hx-include="#table-content input[type=hidden]"
@@ -70,7 +70,7 @@
               type="checkbox"
               data-role="row-checkbox"
               <%= selectedIds[row.id] ? 'checked' : '' %>
-              hx-post="<%= basePath %>/toggle?id=<%= row.id %>"
+              data-replay hx-post="<%= basePath %>/toggle?id=<%= row.id %>"
               hx-target="#table-content"
               hx-swap="outerHTML"
               hx-include="#table-content input[type=hidden]"
@@ -85,7 +85,7 @@
                 hx-swap="outerHTML"
                 hx-include="#table-content input[type=hidden]"
               <% } %>
-            ><%- col.key === 'salary' ? '$' + row[col.key].toLocaleString() : col.key === 'active' ? (row[col.key] ? 'Yes' : 'No') : row[col.key] %></td>
+            ><%= col.key === 'salary' ? '$' + row[col.key].toLocaleString('en-US') : col.key === 'active' ? (row[col.key] ? 'Yes' : 'No') : row[col.key] %></td>
           <% }) %>
         </tr>
       <% }) %>

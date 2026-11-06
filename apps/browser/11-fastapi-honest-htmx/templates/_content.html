@@ -21,7 +21,7 @@
            value="{{ search }}"
            data-role="search-input"
            hx-get="{{ base_path }}/search"
-           hx-trigger="keyup changed delay:300ms"
+           hx-trigger="input changed delay:300ms"
            hx-target="#browser-content"
            hx-swap="outerHTML"
            hx-include="#browser-content input[type=hidden]">
@@ -79,10 +79,10 @@
             <td data-column="name">{{ row.name }}</td>
             <td data-column="status"><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
             <td data-column="createdDate">
-              <span fx-format="date" fx-raw="{{ row.createdDate }}" fx-cloak>{{ row.createdDate }}</span>
+              <span fx-format="date" fx-cloak>{{ row.createdDate }}</span>
             </td>
             <td data-column="value">
-              <span fx-format="currency" fx-raw="{{ row.value }}" fx-currency="USD" fx-cloak>{{ row.value }}</span>
+              <span fx-format="currency" fx-currency="USD" fx-cloak>{{ row.value }}</span>
             </td>
           </tr>
           {% endfor %}

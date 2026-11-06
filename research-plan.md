@@ -2,7 +2,7 @@
 
 Oct 24, 2026 · @Adam Wasserman
 
-An outline for an empirical study comparing alternatives to conventional web application design. The study measures performance differences across client-side state management, server-side code structure, and rendering mode. Every design choice below answers one objection: that the architecture was benchmarked by its own author.
+An outline for an empirical study comparing alternatives to conventional web application design. The study measures performance differences across client-side state management, server-side code structure, and rendering mode. The design aims to limit bias from the author's role as developer of two of the approaches under test.
 
 ## Separate the claims by instrument
 
@@ -57,7 +57,7 @@ Three answers, weakest to strongest.
 
 Register the design, hypotheses, metrics, and analysis plan on OSF before collecting any data.
 
-There is a public theoretical position behind this architecture and a commercial interest in how the numbers come out. Preregistration is the only instrument that answers that objection, and it answers it completely. Without it, every result gets discounted by any reader who finds the project sites.
+There is a public theoretical position behind this architecture and a commercial interest in how the numbers come out. Preregistration reduces this risk by fixing hypotheses and analyses before data collection. It does not remove the risk that the author's implementations favor his own approach. Without it, every result gets discounted by any reader who finds the project sites.
 
 The preregistration also forces the task specification to exist before the implementations, which the design needs anyway.
 
@@ -65,13 +65,13 @@ The preregistration also forces the task specification to exist before the imple
 
 The zero-sync-bugs claim has two halves, and they need different treatment.
 
-**Elimination is analytic.** One copy of state means nothing can desynchronize. Write it as a short proof. Measuring it would be a category error, and a reviewer would say so.
+**Elimination is analytic.** One copy of state means nothing can desynchronize. Write it as a short proof. This study does not measure synchronization defects. We argue in a separate section that a single copy of state rules out one class of them.
 
 **Prevalence is empirical, and more interesting.** Mine the issue trackers of large React and Redux projects for defects classified as state desynchronization. Report the rate, the time to fix, and the severity distribution. Code the sample twice, by two people, and report agreement, because the classification is the whole study.
 
 Published together, the two halves say: this defect class is a measured share of defects in the comparison population, and this architecture cannot produce it.
 
-That is a stronger and more honest result than any benchmark, and it is the one that matches an elimination argument rather than a mitigation argument.
+This argument complements the benchmark; it does not replace it.
 
 ## The framing that would get cited
 
@@ -79,7 +79,7 @@ Not "domx beats Redux." A library comparison gets read by the people already arg
 
 The rendering literature treats hydration cost as a property of server-side rendering. Every strategy in that literature assumes a client-side component tree exists, and argues only about when to build it and how much of it to hydrate. Qwik's resumability goes furthest, and it still serializes a component tree.
 
-This architecture separates hydration cost from the rendering mode. A study that measures hydration cost at three levels of client-side state, holding the rendering mode fixed, says something the field does not currently have.
+This architecture separates hydration cost from the rendering mode. To our knowledge, no published study measures hydration cost at three levels of client-side state with rendering mode held fixed.
 
 Framed that way, the empirical arm becomes a contribution to the rendering literature rather than a product benchmark.
 

@@ -1,0 +1,104 @@
+{
+  "builtAt": "2026-10-30T01:13:09.663Z",
+  "sqliteVersion": {
+    "betterSqlite3": "3.53.4",
+    "pythonSqlite3": "3.50.4"
+  },
+  "databases": {
+    "100": {
+      "file": "100.sqlite",
+      "fileSha256": "11b2977fce04f6bdf01c595a3602ea5d56242ce263358f8b593d981ef2680a2d",
+      "dumpSha256": "ed3d648a040349b61312537cfb1fbfcea055f7b1485aa90a059c9bd6e3458ae6",
+      "sources": {
+        "table": "3a01f66034003fe1c36ab51e56a9cde926b77f4bd22150519e591aa5fc9845c3",
+        "dashboard": "db4b056357ea09fe5557300cde1d15275c1172b960829ea266bba0c4637217c3",
+        "browser": "9bff92996bae6dbc9499064c730e3490ecc6e51ca0245574547aadeef2229056",
+        "form": "3d6672347c62286aae1e95ca0299cb0b749e604fa9af47accb2bcd6d9c91d5b4",
+        "grid": "24ddb22140583267358052e794014a4d85a8c4c6ca94ff5d1197070be36a5b03"
+      },
+      "rowCounts": {
+        "employees": 100,
+        "orders": 100,
+        "browser_records": 100,
+        "customers": 100,
+        "budget_lines": 100
+      }
+    },
+    "1000": {
+      "file": "1000.sqlite",
+      "fileSha256": "7f94eec5cde5846739dd493a847c68236c6222ec5bcb397be0f100ff51eb3842",
+      "dumpSha256": "32e50f26d6d638a11ec895b17381397e00ba2c592d5058aead4acc84a8a71728",
+      "sources": {
+        "table": "43f1cbc7742b645bb7e958a25fc49fbf15b2f82b7680476b533a066942535ae4",
+        "dashboard": "c56b9307a2aba58fb8ab0790398f29667601918f5e6b2772e58ef7939df6f703",
+        "browser": "92d71452f5d3018503ebc88adfb189d7ce7e3a80ed57691704bb1220911d10c5",
+        "form": "3ca1960f42c7c232a64c1a0e1ba9363acebda969f02479672c85ddaef269b032",
+        "grid": "f6c58fb6d8c8d88588da5b13ebb25ae93476027cf231e2c2f88b18f3965c5718"
+      },
+      "rowCounts": {
+        "employees": 1000,
+        "orders": 1000,
+        "browser_records": 1000,
+        "customers": 1000,
+        "budget_lines": 1000
+      }
+    },
+    "10000": {
+      "file": "10000.sqlite",
+      "fileSha256": "39be0c73507b93ab1a211e8799e458d395ecf466a86224ca0beeb684d25d7350",
+      "dumpSha256": "380914990d9e4cd4c989d51edfff48785508519bafc90622831dff69fd632ecf",
+      "sources": {
+        "table": "675e318581be7f01eddc94c5b3f6c4fd059d9ff25d770546b44a7755b9b95a3b",
+        "dashboard": "0e8aeea6908e0294829d5081a42918359c53248b8cf2c858b93cc0fa325e5d01",
+        "browser": "49ed914c8299ccc2cc02c6ffd056b5ba43accd48448e123f5d18f5155e8ba9eb",
+        "form": "3fa2afc38726e6d3e62607ee96404cd56bb9016a7c97cbbca8cabccb7f657ca9",
+        "grid": "1066b6366d5c180b95461fbc84c07829153a7f70a22808b5b2c95c373f2caae8"
+      },
+      "rowCounts": {
+        "employees": 10000,
+        "orders": 10000,
+        "browser_records": 10000,
+        "customers": 10000,
+        "budget_lines": 10000
+      }
+    },
+    "50000": {
+      "file": "50000.sqlite",
+      "fileSha256": "9d266881518b016ae37351f7fdac1e157447793d706c2e4ab06755d92378d051",
+      "dumpSha256": "fc21a7cb78199e7ed9f82baa2549887aab4634602793290e29f38dc948110f4f",
+      "sources": {
+        "table": "9c4b66d912fda98fac21a3e1bd9d8f46db9ddf811e4051335989c19afd7d4430",
+        "dashboard": "59fb1f65b3a28afaa3320d80c14fa892c66f526c581b86d492024a31375450e3",
+        "browser": "3e6bcb312273f2150063270ef175b7332b8da9945923112101cbb54ebf968898",
+        "form": "eb07e17d551d8cbee92ce353e05de8f63eee01750d01d1906302d42ea6ebf1f7",
+        "grid": "09ecc53047ef1eff6e99063525ff3fd44427f9d9d03516b1ee300137c4664c92"
+      },
+      "rowCounts": {
+        "employees": 50000,
+        "orders": 50000,
+        "browser_records": 50000,
+        "customers": 50000,
+        "budget_lines": 50000
+      }
+    },
+    "100000": {
+      "file": "100000.sqlite",
+      "fileSha256": "169929569e9351c022e354dabcc292764f22993d0c25a7a1d49a24e038e221df",
+      "dumpSha256": "fd0506168922e8e27a141d283d570f5de76e8f14ab5ba21618b28b3fe9dd776f",
+      "sources": {
+        "table": "2f4d10fa4f7a52bb02dd8e64d4356acf0969cd0818ae95997ff9225b35111446",
+        "dashboard": "e66df614c4424257a59ea0477c35d3f2186b4f44d47798a6ca40497d17ea022a",
+        "browser": "65e63d26620e0718daff4179f022f4b07fdd0bc9c4c3a16ccf2c9a8600664739",
+        "form": "5227a0356ed3d5db712082ad8b63773268c41bdbc12bc1a870fff4ce9d3d0c4e",
+        "grid": "08c66d136945490f65499d5849311cd9f90392ac8e58fd2d4808e675dced042b"
+      },
+      "rowCounts": {
+        "employees": 100000,
+        "orders": 100000,
+        "browser_records": 100000,
+        "customers": 100000,
+        "budget_lines": 100000
+      }
+    }
+  }
+}

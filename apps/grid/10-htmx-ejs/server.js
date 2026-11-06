@@ -2,150 +2,146 @@ import ejs from 'ejs';
 import { Router } from 'express';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { openMutableGridDb } from '../../lib/sqlite.js';
+import { createTimer } from '../../lib/timing.js';
+import { route, intParam, strParam, selectionParam, sendTimed, requireId, BadRequest } from '../../lib/http-util.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VIEWS = join(__dirname, 'views');
-const ROWS_PER_PAGE = 25;
 
 const QUARTER_FIELDS = ['q1', 'q2', 'q3', 'q4'];
 
-let gridData = [];
+let db = null;
 
 function fmt(n) {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function filterRows(rows, category) {
-  if (!category || category === 'All') return rows;
-  return rows.filter(r => r.category === category);
-}
-
-function computeTotals(rows) {
-  const t = { q1: 0, q2: 0, q3: 0, q4: 0, budgetTarget: 0 };
-  for (const r of rows) {
-    t.q1 += r.q1; t.q2 += r.q2; t.q3 += r.q3; t.q4 += r.q4;
-    t.budgetTarget += r.budgetTarget;
-  }
-  t.total = t.q1 + t.q2 + t.q3 + t.q4;
-  t.variance = t.total - t.budgetTarget;
-  return t;
-}
-
-function computeView(categoryFilter, page, selectedIds) {
-  const categories = [...new Set(gridData.map(r => r.category))].sort();
-  const filtered = filterRows(gridData, categoryFilter);
-  const totals = computeTotals(filtered);
-  const totalRows = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(totalRows / ROWS_PER_PAGE));
-  const p = Math.min(Math.max(1, page), totalPages);
-  const pageRows = filtered.slice((p - 1) * ROWS_PER_PAGE, p * ROWS_PER_PAGE);
-  const visibleIds = pageRows.map(r => r.id);
-  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds[id]);
-  const selCount = Object.keys(selectedIds).length;
-  return { pageRows, totalRows, totalPages, page: p, allVisibleSelected, selCount, categories, totals };
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function parseState(query, body) {
   const src = { ...query, ...body };
   return {
     categoryFilter: src.categoryFilter || 'All',
-    page: parseInt(src.page, 10) || 1,
-    selectedIds: (() => { try { return JSON.parse(src.selected || '{}'); } catch { return {}; } })(),
+    page: intParam(src.page, 'page'),
+    selectedIds: selectionParam(src.selected),
     bulkQuarter: src.bulkQuarter || 'q1',
     bulkValue: src.bulkValue || '',
   };
 }
 
-async function renderContent(state, basePath) {
+async function renderContent(state, basePath, timer = createTimer()) {
   const { categoryFilter, page, selectedIds, bulkQuarter, bulkValue } = state;
-  const view = computeView(categoryFilter, page, selectedIds);
-  return ejs.renderFile(join(VIEWS, '_content.ejs'), {
-    ...view, rows: view.pageRows,
+  const { result, totals, categories } = timer.time('load', () => ({
+    result: db.page({ category: categoryFilter, page }),
+    totals: db.totals({ category: categoryFilter }),
+    categories: db.categories(),
+  }));
+  const visibleIds = result.rows.map(r => r.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds[id]);
+  const selCount = Object.keys(selectedIds).length;
+  return timer.timeAsync('render', () => ejs.renderFile(join(VIEWS, '_content.ejs'), {
+    rows: result.rows,
+    totalRows: result.total,
+    totalPages: result.totalPages,
+    page: result.page,
+    allVisibleSelected, selCount, categories, totals,
     categoryFilter, selectedIds, basePath, bulkQuarter, bulkValue, fmt,
-  });
+  }, { cache: true }));
 }
 
-export async function render(data, opts) {
-  gridData = [...data];
+async function sendContent(res, state, basePath) {
+  const timer = createTimer();
+  sendTimed(res, timer, await renderContent(state, basePath, timer));
+}
+
+// Opening the working copy is setup and is not timed. Each page load gets a
+// fresh copy of the pristine database, and the previous copy is removed.
+export async function render(sqlitePath, opts, timer = createTimer()) {
+  db?.dispose();
+  db = openMutableGridDb(sqlitePath);
+  const { result, totals, categories } = timer.time('load', () => ({
+    result: db.page({ category: 'All', page: 1 }),
+    totals: db.totals({ category: 'All' }),
+    categories: db.categories(),
+  }));
   const basePath = `/${opts.archetype}/10-htmx-ejs`;
-  const view = computeView('All', 1, {});
-  return ejs.renderFile(join(VIEWS, 'page.ejs'), {
-    ...view,
+  return timer.timeAsync('render', () => ejs.renderFile(join(VIEWS, 'page.ejs'), {
+    pageRows: result.rows,
+    totalRows: result.total,
+    totalPages: result.totalPages,
+    page: result.page,
+    allVisibleSelected: false, selCount: 0, categories, totals,
     categoryFilter: 'All', selectedIds: {}, basePath,
     bulkQuarter: 'q1', bulkValue: '', fmt,
     archetype: opts.archetype, arm: opts.arm, dataRows: opts.rows,
-  });
+  }, { cache: true }));
 }
 
 export function partialRouter(dataDir, archetype) {
   const router = Router();
+  // Partials act on the working copy that the last page load opened.
+  router.use((req, res, next) => (db || req.path === '/' ? next() : next(new BadRequest('load the page before sending partial requests'))));
   const basePath = `/${archetype}/10-htmx-ejs`;
 
-  router.get('/filter', async (req, res) => {
+  router.get('/filter', route(async (req, res) => {
     const state = parseState(req.query);
     state.categoryFilter = req.query.cat || 'All';
     state.page = 1;
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
-  router.get('/page', async (req, res) => {
+  router.get('/page', route(async (req, res) => {
     const state = parseState(req.query);
-    state.page = parseInt(req.query.p, 10) || 1;
-    res.send(await renderContent(state, basePath));
-  });
+    state.page = intParam(req.query.p, 'p');
+    await sendContent(res, state, basePath);
+  }));
 
-  router.post('/toggle', async (req, res) => {
+  router.post('/toggle', route(async (req, res) => {
     const state = parseState(req.query, req.body);
-    const id = parseInt(req.query.id, 10);
+    const id = requireId(req.query.id);
     if (state.selectedIds[id]) delete state.selectedIds[id];
     else state.selectedIds[id] = true;
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
-  router.post('/toggle-all', async (req, res) => {
+  router.post('/toggle-all', route(async (req, res) => {
     const state = parseState(req.query, req.body);
-    const view = computeView(state.categoryFilter, state.page, state.selectedIds);
-    const ids = view.pageRows.map(r => r.id);
+    const result = db.page({ category: state.categoryFilter, page: state.page });
+    const ids = result.rows.map(r => r.id);
     const all = ids.every(id => state.selectedIds[id]);
     if (all) ids.forEach(id => delete state.selectedIds[id]);
     else ids.forEach(id => { state.selectedIds[id] = true; });
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
-  router.get('/edit-cell', async (req, res) => {
-    const id = parseInt(req.query.id, 10);
+  router.get('/edit-cell', route(async (req, res) => {
+    const id = requireId(req.query.id);
     const col = req.query.col;
     if (!QUARTER_FIELDS.includes(col)) { res.status(400).send(''); return; }
-    const row = gridData.find(r => r.id === id);
+    const timer = createTimer();
+    const row = timer.time('load', () => db.getById(id));
     if (!row) { res.status(404).send(''); return; }
-    const html = await ejs.renderFile(join(VIEWS, '_edit-cell.ejs'), { id, col, value: row[col], basePath });
-    res.send(html);
-  });
+    const html = await timer.timeAsync('render', () => ejs.renderFile(join(VIEWS, '_edit-cell.ejs'), { id, col, value: row[col], basePath }, { cache: true }));
+    sendTimed(res, timer, html);
+  }));
 
-  router.post('/commit-edit', async (req, res) => {
+  router.post('/commit-edit', route(async (req, res) => {
     const state = parseState(req.query, req.body);
-    const id = parseInt(req.query.id, 10);
+    const id = requireId(req.query.id);
     const col = req.query.col;
     const value = req.body?.editValue ?? req.query.editValue ?? '';
-    const row = gridData.find(r => r.id === id);
-    if (row && QUARTER_FIELDS.includes(col)) {
-      const num = parseFloat(value);
-      if (!isNaN(num)) row[col] = num;
-    }
-    res.send(await renderContent(state, basePath));
-  });
+    if (!db.updateCell(id, col, value)) throw new BadRequest('invalid cell value');
+    await sendContent(res, state, basePath);
+  }));
 
-  router.post('/bulk-fill', async (req, res) => {
+  router.post('/bulk-fill', route(async (req, res) => {
     const state = parseState(req.query, req.body);
     const quarter = state.bulkQuarter;
-    const num = parseFloat(state.bulkValue);
-    if (!isNaN(num) && QUARTER_FIELDS.includes(quarter) && Object.keys(state.selectedIds).length > 0) {
-      for (const row of gridData) {
-        if (state.selectedIds[row.id]) row[quarter] = num;
-      }
+    const ids = Object.keys(state.selectedIds).map(Number);
+    if (ids.length > 0) {
+      if (!db.bulkFill(ids, quarter, state.bulkValue)) throw new BadRequest('invalid bulk value');
     }
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
   return router;
 }

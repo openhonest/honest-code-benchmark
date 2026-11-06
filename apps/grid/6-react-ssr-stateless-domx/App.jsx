@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useServerPage, postJSON } from '../../lib/arm6-client.js';
 
-const ROWS_PER_PAGE = 25;
 
-function fmt(n) { return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmt(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 let domxModule = null;
 const stateManifest = {
@@ -50,8 +50,6 @@ function useDomStateSSR(manifest) {
   return { domState, ready };
 }
 
-let rowData = [];
-
 function EditableCell({ row, field, editingCell, editingValue }) {
   const isEditing = editingCell?.id === row.id && editingCell?.field === field;
   if (isEditing) {
@@ -61,12 +59,9 @@ function EditableCell({ row, field, editingCell, editingValue }) {
           onChange={e => writeState({ editValue: e.target.value })}
           onKeyDown={e => {
             if (e.key === 'Enter') {
-              const num = parseFloat(editingValue);
-              if (!isNaN(num)) {
-                const target = rowData.find(r => r.id === editingCell.id);
-                if (target) target[editingCell.field] = num;
-              }
-              writeState({ editing: '', editValue: '', dataVersion: String(Date.now()) });
+              // The server applies the money rule and answers 400 on bad input.
+              postJSON('cell', { id: editingCell.id, field: editingCell.field, value: editingValue })
+                .finally(() => writeState({ editing: '', editValue: '', dataVersion: String(Date.now()) }));
             } else if (e.key === 'Escape') {
               writeState({ editing: '', editValue: '' });
             }
@@ -82,52 +77,27 @@ function EditableCell({ row, field, editingCell, editingValue }) {
   );
 }
 
-export default function App({ initialData }) {
-  const { domState, ready } = useDomStateSSR(stateManifest);
-  const hydrated = useRef(false);
+const INITIAL_QUERY = { category: 'All', page: '1', v: '0' };
 
-  if (initialData && !hydrated.current) {
-    rowData = initialData;
-    hydrated.current = true;
-  }
+export default function App({ initialPage }) {
+  const { domState, ready } = useDomStateSSR(stateManifest);
 
   const catFilter = ready ? (domState.categoryFilter || 'All') : 'All';
-  const currentPage = ready ? (parseInt(domState.page, 10) || 1) : 1;
+  const requestedPage = ready ? (parseInt(domState.page, 10) || 1) : 1;
   const selectedIds = ready ? parseJSON(domState.selected, {}) : {};
   const editingCell = ready ? parseJSON(domState.editing, null) : null;
   const editingValue = ready ? (domState.editValue || '') : '';
   const bq = ready ? (domState.bulkQuarter || 'q1') : 'q1';
   const bv = ready ? (domState.bulkValue || '') : '';
+  const version = ready ? (domState.dataVersion || '0') : '0';
+
+  const pageData = useServerPage(initialPage, { category: catFilter, page: String(requestedPage), v: version }, INITIAL_QUERY);
 
   useEffect(() => {
-    if (!initialData && typeof window !== 'undefined') {
-      const config = window.__BENCHMARK_CONFIG__;
-      fetch(config.dataUrl).then(r => r.json()).then(data => { rowData = data; });
-    }
-  }, [initialData]);
-
-  useEffect(() => {
-    if (ready && rowData.length > 0) {
-      writeState({ page: '1', selected: '{}', dataVersion: '1' });
-    }
+    if (ready) writeState({ page: '1', selected: '{}' });
   }, [ready]);
 
-  const categories = useMemo(() => [...new Set(rowData.map(r => r.category))].sort(), [domState.dataVersion]);
-
-  const filtered = useMemo(() => {
-    if (catFilter === 'All') return rowData;
-    return rowData.filter(r => r.category === catFilter);
-  }, [catFilter, domState.dataVersion]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
-  const pageRows = filtered.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
-
-  const totals = useMemo(() => {
-    const t = { q1: 0, q2: 0, q3: 0, q4: 0, budgetTarget: 0 };
-    for (const r of filtered) { t.q1 += r.q1; t.q2 += r.q2; t.q3 += r.q3; t.q4 += r.q4; t.budgetTarget += r.budgetTarget; }
-    t.total = t.q1 + t.q2 + t.q3 + t.q4; t.variance = t.total - t.budgetTarget;
-    return t;
-  }, [filtered]);
+  const { categories, totals, rows: pageRows, page: currentPage, totalPages } = pageData;
 
   const visibleIds = pageRows.map(r => r.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds[id]);
@@ -149,12 +119,10 @@ export default function App({ initialData }) {
   }, [pageRows, selectedIds]);
 
   const handleBulkFill = useCallback(() => {
-    const num = parseFloat(bv);
-    if (isNaN(num) || selCount === 0) return;
-    for (const r of rowData) {
-      if (selectedIds[r.id]) r[bq] = num;
-    }
-    writeState({ dataVersion: String(Date.now()) });
+    if (selCount === 0) return;
+    const ids = Object.keys(selectedIds).map(Number);
+    postJSON('bulk', { ids, field: bq, value: bv })
+      .finally(() => writeState({ dataVersion: String(Date.now()) }));
   }, [bq, bv, selectedIds, selCount]);
 
   return (

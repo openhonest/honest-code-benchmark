@@ -1,7 +1,11 @@
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import App from './App.jsx';
+import ServerApp from './ServerApp.jsx';
 
 export function render(data) {
-  return renderToString(<App initialData={data} />);
+  const renderStart = performance.now();
+  const html = renderToString(<ServerApp data={data} />);
+  const renderMs = performance.now() - renderStart;
+
+  return { html, timing: { render: renderMs } };
 }

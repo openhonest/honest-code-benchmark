@@ -14,7 +14,14 @@ export const initScript = `
     eventEntries: [],
     lcpEntries: [],
     layoutShifts: [],
+    mutationTimestamps: [],
   };
+
+  new MutationObserver(() => {
+    window.__harness.mutationTimestamps.push(performance.now());
+  }).observe(document.documentElement, {
+    childList: true, subtree: true, attributes: true, characterData: true,
+  });
 
   new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
@@ -131,6 +138,38 @@ export async function afterRun(page, cdpSession) {
       }
     }
 
+    // Interaction-to-settled: time from each user input to the last DOM mutation
+    // before the next input. Uses mutation timestamps paired with event entries.
+    const mutations = window.__harness.mutationTimestamps;
+    let interactionToSettled = null;
+    const perInteractionSettled = [];
+    if (eventEntries.length > 0 && mutations.length > 0) {
+      const interactionStarts = new Map();
+      for (const e of eventEntries) {
+        if (e.interactionId === 0) continue;
+        if (!interactionStarts.has(e.interactionId)) {
+          interactionStarts.set(e.interactionId, e.startTime);
+        }
+      }
+      const starts = [...interactionStarts.entries()].sort((a, b) => a[1] - b[1]);
+      for (let i = 0; i < starts.length; i++) {
+        const triggerTime = starts[i][1];
+        const nextTrigger = i < starts.length - 1 ? starts[i + 1][1] : Infinity;
+        let lastMutation = null;
+        for (const m of mutations) {
+          if (m >= triggerTime && m < nextTrigger) lastMutation = m;
+        }
+        if (lastMutation !== null) {
+          perInteractionSettled.push(lastMutation - triggerTime);
+        }
+      }
+      if (perInteractionSettled.length > 0) {
+        const sorted = perInteractionSettled.slice().sort((a, b) => a - b);
+        const idx = Math.min(Math.ceil(sorted.length * 0.98) - 1, sorted.length - 1);
+        interactionToSettled = sorted[idx];
+      }
+    }
+
     // CLS: session-window algorithm (1s gap, 5s cap, largest window wins)
     const shifts = window.__harness.layoutShifts;
     let cls = 0;
@@ -180,10 +219,12 @@ export async function afterRun(page, cdpSession) {
 
     return {
       ttfb, fcp: fcpTime, lcp: lcpTime, tti, tbt, inp, cls,
+      interactionToSettled, perInteractionSettled,
       peakHeap, memorySource, serverTiming, bundleSize,
       longTaskCount: longTasks.length,
       layoutShiftCount: shifts.length,
       eventEntryCount: eventEntries.length,
+      mutationCount: mutations.length,
       interactionCount: eventEntries.length > 0
         ? new Set(eventEntries.filter(e => e.interactionId > 0).map(e => e.interactionId)).size
         : 0,

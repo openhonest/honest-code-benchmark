@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useServerPage, getJSON } from '../../lib/arm6-client.js';
 
 const COLUMNS = [
   { key: 'name', label: 'Name' },
@@ -8,8 +9,6 @@ const COLUMNS = [
 ];
 
 const STATUSES = ['active', 'inactive', 'pending', 'archived', 'flagged'];
-const ROWS_PER_PAGE = 25;
-
 let domxModule = null;
 const stateManifest = {
   search:       { selector: '#browser-state', read: 'data:search',       write: 'data:search' },
@@ -49,62 +48,39 @@ function useDomStateSSR(manifest) {
   return { domState, ready };
 }
 
-let rowData = [];
+const INITIAL_QUERY = { q: '', status: 'all', col: '', dir: '', page: '1' };
 
-export default function App({ initialData }) {
+export default function App({ initialPage }) {
   const { domState, ready } = useDomStateSSR(stateManifest);
   const searchTimeout = useRef(null);
-  const hydrated = useRef(false);
-
-  if (initialData && !hydrated.current) {
-    rowData = initialData;
-    hydrated.current = true;
-  }
 
   const searchText = ready ? (domState.search || '') : '';
   const statusFilter = ready ? (domState.statusFilter || 'all') : 'all';
   const sortCol = ready ? (domState.sortCol || null) : null;
   const sortDir = ready ? (domState.sortDir || null) : null;
-  const currentPage = ready ? (parseInt(domState.page, 10) || 1) : 1;
+  const requestedPage = ready ? (parseInt(domState.page, 10) || 1) : 1;
   const selectedId = ready ? (domState.selectedId ? parseInt(domState.selectedId, 10) : null) : null;
 
-  useEffect(() => {
-    if (!initialData && typeof window !== 'undefined') {
-      const config = window.__BENCHMARK_CONFIG__;
-      fetch(config.dataUrl)
-        .then(r => r.json())
-        .then(data => { rowData = data; });
-    }
-  }, [initialData]);
+  const pageData = useServerPage(initialPage, {
+    q: searchText, status: statusFilter, col: sortCol || '', dir: sortDir || '', page: String(requestedPage),
+  }, INITIAL_QUERY);
 
   useEffect(() => {
-    if (ready && rowData.length > 0) {
-      writeState({ page: '1', statusFilter: 'all' });
-    }
+    if (ready) writeState({ page: '1', statusFilter: 'all' });
   }, [ready]);
 
-  const filteredSorted = useMemo(() => {
-    let rows = rowData;
-    if (searchText) {
-      const s = searchText.toLowerCase();
-      rows = rows.filter(r => r.name.toLowerCase().includes(s));
-    }
-    if (statusFilter !== 'all') {
-      rows = rows.filter(r => r.status === statusFilter);
-    }
-    if (sortCol && sortDir) {
-      rows = [...rows].sort((a, b) => {
-        const av = a[sortCol], bv = b[sortCol];
-        let cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
-        return sortDir === 'desc' ? -cmp : cmp;
-      });
-    }
-    return rows;
-  }, [searchText, statusFilter, sortCol, sortDir, rowData.length]);
+  const { rows: pageRows, page: currentPage, totalPages } = pageData;
 
-  const totalPages = Math.max(1, Math.ceil(filteredSorted.length / ROWS_PER_PAGE));
-  const pageRows = filteredSorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
-  const selectedRecord = selectedId != null ? rowData.find(r => r.id === selectedId) : null;
+  // The selected record may sit on another page, so it comes from the server.
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  useEffect(() => {
+    if (selectedId == null) { setSelectedRecord(null); return; }
+    const onPage = pageRows.find(r => r.id === selectedId);
+    if (onPage) { setSelectedRecord(onPage); return; }
+    let live = true;
+    getJSON(`record/${selectedId}`).then(r => { if (live) setSelectedRecord(r); });
+    return () => { live = false; };
+  }, [selectedId]);
 
   const handleSearch = useCallback((e) => {
     const value = e.target.value;
@@ -140,7 +116,7 @@ export default function App({ initialData }) {
             {s.charAt(0).toUpperCase() + s.slice(1)}
           </button>
         ))}
-        <span style={{ marginLeft: 'auto' }}>{filteredSorted.length} records</span>
+        <span style={{ marginLeft: 'auto' }}>{pageData.total} records</span>
       </div>
 
       <div style={{ display: 'flex', gap: '1rem' }}>
@@ -164,7 +140,7 @@ export default function App({ initialData }) {
                   <td data-column="name">{row.name}</td>
                   <td data-column="status"><span className={`badge badge-${row.status}`}>{row.status}</span></td>
                   <td data-column="createdDate">{row.createdDate}</td>
-                  <td data-column="value">${row.value.toLocaleString()}</td>
+                  <td data-column="value">${row.value.toLocaleString('en-US')}</td>
                 </tr>
               ))}
             </tbody>
@@ -186,7 +162,7 @@ export default function App({ initialData }) {
               <dt>Name</dt><dd>{selectedRecord.name}</dd>
               <dt>Status</dt><dd><span className={`badge badge-${selectedRecord.status}`}>{selectedRecord.status}</span></dd>
               <dt>Created</dt><dd>{selectedRecord.createdDate}</dd>
-              <dt>Value</dt><dd>${selectedRecord.value.toLocaleString()}</dd>
+              <dt>Value</dt><dd>${selectedRecord.value.toLocaleString('en-US')}</dd>
             </dl>
           </div>
         )}

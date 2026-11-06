@@ -10,7 +10,7 @@
   <dl>
     <dt>Name</dt><dd>{{ selected_record.name }}</dd>
     <dt>Status</dt><dd><span class="badge badge-{{ selected_record.status }}">{{ selected_record.status }}</span></dd>
-    <dt>Created</dt><dd><span fx-format="date" fx-raw="{{ selected_record.createdDate }}" fx-cloak>{{ selected_record.createdDate }}</span></dd>
-    <dt>Value</dt><dd><span fx-format="currency" fx-raw="{{ selected_record.value }}" fx-currency="USD" fx-cloak>{{ selected_record.value }}</span></dd>
+    <dt>Created</dt><dd><span fx-format="date" fx-cloak>{{ selected_record.createdDate }}</span></dd>
+    <dt>Value</dt><dd><span fx-format="currency" fx-currency="USD" fx-cloak>{{ selected_record.value }}</span></dd>
   </dl>
 </div>

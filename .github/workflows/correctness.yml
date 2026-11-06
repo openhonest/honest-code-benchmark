@@ -1,0 +1,83 @@
+# Correctness checks only. Nothing here measures or reports timing.
+name: correctness
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+          cache-dependency-path: |
+            apps/package-lock.json
+            harness/package-lock.json
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install
+        run: |
+          npm ci --prefix apps
+          npm ci --prefix harness
+          npx --prefix harness playwright install --with-deps chromium
+          cd apps && uv sync --frozen
+
+      - name: Data is reproducible
+        run: |
+          DATA_OUT_DIR=/tmp/regen node generate-data.js
+          diff -r -x sqlite -x .DS_Store data /tmp/regen
+
+      - name: Build SQLite files
+        run: node data/sqlite/build.js
+
+      - name: Build bundles
+        run: npm run build --prefix apps
+
+      - name: Unit tests (value rules, Node and Python)
+        working-directory: apps
+        run: |
+          node --test tests/
+          .venv/bin/python -m unittest discover -s tests
+
+      - name: SSR parity (Arms 7-9 markup and bundles)
+        working-directory: apps
+        run: node scripts/check-ssr-parity.mjs --sizes 100,1000
+
+      - name: Start servers
+        working-directory: apps
+        run: |
+          nohup .venv/bin/python fastapi-server.py --port 4001 > /tmp/fastapi.log 2>&1 &
+          nohup node server.js --port 4000 --fastapi-port 4001 > /tmp/node.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fsS -o /dev/null http://127.0.0.1:4000/table/1-useState/?rows=100 &&
+            curl -fsS -o /dev/null http://127.0.0.1:4001/table/11-fastapi-honest-htmx/?rows=100 && exit 0
+            sleep 1
+          done
+          cat /tmp/node.log /tmp/fastapi.log; exit 1
+
+      - name: Hydration (no React mismatch errors)
+        working-directory: apps
+        run: node scripts/check-hydration.mjs --base http://127.0.0.1:4000 --sizes 100,1000
+
+      - name: Row order (shared sort rule)
+        working-directory: apps
+        run: node scripts/check-row-order.mjs --base http://127.0.0.1:4000 --sizes 100,1000
+
+      - name: Reload replay (Arms 10 and 11)
+        working-directory: apps
+        run: node scripts/check-reload-replay.mjs --base http://127.0.0.1:4000 --sizes 100,1000
+
+      - name: Harness interaction scripts (all 55 pairs)
+        working-directory: harness
+        run: node src/runner.js --check --base http://127.0.0.1:4000 --sizes 100,1000
+
+      - name: Server logs
+        if: failure()
+        run: cat /tmp/node.log /tmp/fastapi.log

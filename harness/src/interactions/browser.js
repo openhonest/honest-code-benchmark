@@ -1,32 +1,39 @@
 // Interaction script: large dataset browser (Archetype 4).
 //
-// Preregistration sequence:
-//   Scroll to row ~500, search for a name, click a result,
-//   shift-click to select a range, apply a batch status update.
+// Selector contract: [data-role=search-input|status-filter|detail-panel|
+//   detail-close|page-info], th[data-column=<key>], tr[data-row=<id>],
+//   [data-action=prev-page|next-page].
+//
+// Sequence: page forward, search for "Taylor" (a surname present at every
+// data size), open the first result in the detail panel, close it, filter
+// by a status, sort by name.
+
+import { settle, prepare, clickIfEnabled } from './settle.js';
 
 export default async function browserInteraction(page) {
-  const viewport = page.locator('[data-role="virtual-list"]');
+  prepare(page);
 
-  // Scroll to approximately row 500 (row height 48px, so ~24000px)
-  await viewport.evaluate(el => { el.scrollTop = 24000; });
-  await page.waitForTimeout(500);
+  await clickIfEnabled(page, '[data-action="next-page"]');
+  await settle(page);
 
-  // Search for a name
-  await page.fill('[data-role="search-input"]', 'Anderson');
-  await page.waitForTimeout(400);
+  await page.fill('[data-role="search-input"]', 'Taylor');
+  await settle(page, 400);
 
-  // Click the first search result to open detail panel
-  await page.click('[data-role="virtual-list"] tr:nth-child(1)');
-  await page.waitForTimeout(300);
+  await page.click('tbody tr[data-row]:first-child');
+  await page.locator('[data-role="detail-panel"]').waitFor();
+  await settle(page);
+  await page.click('[data-role="detail-close"]');
+  await settle(page);
 
-  // Shift-click the fifth result to select a range
-  await page.click('[data-role="virtual-list"] tr:nth-child(5)', {
-    modifiers: ['Shift'],
-  });
-  await page.waitForTimeout(300);
+  // A status filter is a <select> in some arms and a button group in others.
+  const status = page.locator('[data-role="status-filter"]');
+  if ((await status.first().evaluate((el) => el.tagName)) === 'SELECT') {
+    await status.first().selectOption({ index: 1 });
+  } else {
+    await status.nth(1).click();
+  }
+  await settle(page);
 
-  // Apply batch status update
-  await page.selectOption('[data-role="batch-status"]', 'archived');
-  await page.click('[data-action="apply-batch"]');
-  await page.waitForTimeout(500);
+  await page.click('th[data-column="name"]');
+  await settle(page);
 }

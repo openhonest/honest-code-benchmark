@@ -1,4 +1,5 @@
 import { signal, computed } from '@preact/signals-react';
+import { parseMoney } from '../../lib/value-rules.js';
 
 const ROWS_PER_PAGE = 25;
 
@@ -57,8 +58,8 @@ export function setEditVal(v) { editingValue.value = v; }
 export function commitEdit() {
   const cell = editingCell.value;
   if (!cell) return;
-  const num = parseFloat(editingValue.value);
-  if (!isNaN(num)) {
+  const num = parseMoney(editingValue.value);
+  if (num !== null) {
     data.value = data.value.map(r => r.id === cell.id ? { ...r, [cell.field]: num } : r);
   }
   editingCell.value = null;
@@ -67,8 +68,8 @@ export function commitEdit() {
 export function cancelEditAction() { editingCell.value = null; editingValue.value = ''; }
 
 export function doBulkFill() {
-  const num = parseFloat(bulkValue.value);
-  if (isNaN(num)) return;
+  const num = parseMoney(bulkValue.value);
+  if (num === null) return;
   const q = bulkQuarter.value;
   const sel = selectedIds.value;
   data.value = data.value.map(r => sel[r.id] ? { ...r, [q]: num } : r);

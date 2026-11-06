@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Benchmark: {{ archetype }} / {{ arm }}</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+  <script src="/htmx/htmx.min.js"></script>
+  <script src="/lib/htmx-replay.js" defer></script>
+</head>
+<body>
+  <div id="root">
+    <div class="app" hx-sync="this:replace">
+      {{ content_block | safe }}
+      <div hidden data-role="refresh-poller"
+        hx-sync="closest .app:drop"
+        hx-get="{{ base_path }}/refresh"
+        hx-trigger="{{ refresh_trigger }}"
+        hx-target="#dashboard-content"
+        hx-swap="outerHTML"
+        hx-include="#dashboard-content input[type=hidden]"></div>
+    </div>
+  </div>
+  <script>
+    window.__BENCHMARK_CONFIG__ = { archetype: "{{ archetype }}", arm: "{{ arm }}", rows: {{ data_rows }}, refreshSeconds: {{ refresh_seconds }} };
+  </script>
+</body>
+</html>

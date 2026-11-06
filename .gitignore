@@ -5,11 +5,21 @@ __pycache__/
 *.pyc
 .DS_Store
 harness/results/
-apps/package-lock.json
-harness/package-lock.json
+
+# Generated SQLite databases (built from data/*.json by data/sqlite/build.js)
+data/sqlite/*.sqlite
 
 # Separate repos living in this workspace (not part of the benchmark)
 /domx/
 /genX/
 /stateless/
 /dataos-site/
+
+# OS and editor droppings
+._*
+Thumbs.db
+*.swp
+
+# Scratch and run output
+*.log
+results/

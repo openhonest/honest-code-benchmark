@@ -242,6 +242,12 @@ input[type="checkbox"] {
 }
 
 /* Dashboard */
+.last-updated {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -298,14 +304,6 @@ input[type="checkbox"] {
   font-size: 20px;
   cursor: pointer;
   color: #666;
-}
-
-/* Virtual list */
-.virtual-list-container {
-  height: 600px;
-  overflow-y: auto;
-  border: 1px solid #e5e5e5;
-  border-radius: 4px;
 }
 
 /* Editable grid */

@@ -27,13 +27,16 @@ const ARMS = [
   '9-react-ssr-conventional',
   '10-htmx-ejs',
   '11-fastapi-honest-htmx',
+  '12-fastapi-honest-nogenx',
+  '13-htmx-ejs-conventional',
 ];
 
-const FASTAPI_ARMS = new Set(['11-fastapi-honest-htmx']);
+const FASTAPI_ARMS = new Set(['11-fastapi-honest-htmx', '12-fastapi-honest-nogenx']);
 const SSR_HTMX_ARMS = new Set([
   '6-react-ssr-stateless-domx', '7-react-ssr-honest',
   '8-react-ssr-domain-classes', '9-react-ssr-conventional',
-  '10-htmx-ejs', '11-fastapi-honest-htmx',
+  '10-htmx-ejs', '11-fastapi-honest-htmx', '12-fastapi-honest-nogenx',
+  '13-htmx-ejs-conventional',
 ]);
 const ARCHETYPES = ['table', 'form', 'dashboard', 'browser', 'grid'];
 

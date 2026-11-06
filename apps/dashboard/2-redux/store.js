@@ -13,9 +13,12 @@ const dashboardSlice = createSlice({
     sortColumn: null,
     sortDirection: null,
     currentPage: 1,
+    lastUpdated: '',
   },
   reducers: {
-    setData(state, action) { state.data = action.payload; state.currentPage = 1; },
+    // A load or refresh replaces the rows and the timestamp; filters, sort and
+    // page stay as the user left them.
+    setData(state, action) { state.data = action.payload.rows; state.lastUpdated = action.payload.at; },
     setCategoryFilter(state, action) { state.categoryFilter = action.payload; state.currentPage = 1; },
     setStatusFilter(state, action) { state.statusFilter = action.payload; state.currentPage = 1; },
     setDateFrom(state, action) { state.dateFrom = action.payload; state.currentPage = 1; },
@@ -49,10 +52,17 @@ export function selectSorted(state) {
   const filtered = filterRows(state.dashboard);
   const { sortColumn, sortDirection } = state.dashboard;
   if (!sortColumn || !sortDirection) return filtered;
+  const sign = sortDirection === 'desc' ? -1 : 1;
   return [...filtered].sort((a, b) => {
     const av = a[sortColumn], bv = b[sortColumn];
-    let cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
-    return sortDirection === 'desc' ? -cmp : cmp;
+    let cmp = 0;
+    if (typeof av === 'string') {
+      const al = av.toLowerCase(), bl = bv.toLowerCase();
+      cmp = al < bl ? -1 : al > bl ? 1 : 0;
+    } else {
+      cmp = av - bv;
+    }
+    return cmp !== 0 ? sign * cmp : (a.id < b.id ? -1 : 1);
   });
 }
 

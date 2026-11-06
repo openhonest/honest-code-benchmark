@@ -56,7 +56,7 @@
             type="checkbox"
             data-role="select-all"
             <%= allVisibleSelected ? 'checked' : '' %>
-            hx-post="<%= basePath %>/toggle-all"
+            data-replay hx-post="<%= basePath %>/toggle-all"
             hx-target="#grid-content"
             hx-swap="outerHTML"
             hx-include="#grid-content input[type=hidden]"
@@ -83,7 +83,7 @@
               type="checkbox"
               data-role="row-checkbox"
               <%= selectedIds[row.id] ? 'checked' : '' %>
-              hx-post="<%= basePath %>/toggle?id=<%= row.id %>"
+              data-replay hx-post="<%= basePath %>/toggle?id=<%= row.id %>"
               hx-target="#grid-content"
               hx-swap="outerHTML"
               hx-include="#grid-content input[type=hidden]"

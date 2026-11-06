@@ -1,4 +1,4 @@
-import { signal, computed } from '@preact/signals-react';
+import { signal, computed, batch } from '@preact/signals-react';
 
 const ROWS_PER_PAGE = 25;
 
@@ -10,6 +10,7 @@ export const dateTo = signal('');
 export const sortColumn = signal(null);
 export const sortDirection = signal(null);
 export const currentPage = signal(1);
+export const lastUpdated = signal('');
 
 export const filtered = computed(() => {
   let rows = data.value;
@@ -23,10 +24,17 @@ export const filtered = computed(() => {
 export const sorted = computed(() => {
   const col = sortColumn.value, dir = sortDirection.value;
   if (!col || !dir) return filtered.value;
+  const sign = dir === 'desc' ? -1 : 1;
   return [...filtered.value].sort((a, b) => {
     const av = a[col], bv = b[col];
-    let cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
-    return dir === 'desc' ? -cmp : cmp;
+    let cmp = 0;
+    if (typeof av === 'string') {
+      const al = av.toLowerCase(), bl = bv.toLowerCase();
+      cmp = al < bl ? -1 : al > bl ? 1 : 0;
+    } else {
+      cmp = av - bv;
+    }
+    return cmp !== 0 ? sign * cmp : (a.id < b.id ? -1 : 1);
   });
 });
 
@@ -37,7 +45,11 @@ export const pageRows = computed(() => {
 
 export const totalPages = computed(() => Math.max(1, Math.ceil(sorted.value.length / ROWS_PER_PAGE)));
 
-export function setData(rows) { data.value = rows; currentPage.value = 1; }
+// A load or refresh replaces the rows and the timestamp; filters, sort and
+// page stay as the user left them.
+export function setData(rows) {
+  batch(() => { data.value = rows; lastUpdated.value = new Date().toISOString(); });
+}
 export function doSort(col) {
   if (sortColumn.value === col) {
     if (sortDirection.value === 'asc') sortDirection.value = 'desc';

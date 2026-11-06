@@ -1,10 +1,18 @@
 <div id="form-content">
   <%/* Hidden inputs carry all form state across htmx swaps */%>
   <input type="hidden" name="step" value="<%= step %>" />
-  <% for (const [key, val] of Object.entries(fields)) { %>
-    <input type="hidden" name="<%= key %>" value="<%- val %>" />
+  <%/* Only fields not shown on this step get a hidden input, so each field
+       is posted once */%>
+  <% const shown = ({
+       1: ['firstName', 'lastName', 'email', 'phone'],
+       2: ['street', 'city', 'state', 'zip', 'country'],
+       3: fields.accountType === 'business'
+         ? ['accountType', 'companyName', 'taxId', 'poNumber'] : ['accountType'],
+     })[step] || []; %>
+  <% for (const [key, val] of Object.entries(fields)) { if (shown.includes(key)) continue; %>
+    <input type="hidden" name="<%= key %>" value="<%= val %>" />
   <% } %>
-  <input type="hidden" name="errors" value="<%- JSON.stringify(errors) %>" />
+  <input type="hidden" name="errors" value="<%= JSON.stringify(errors) %>" />
 
   <div class="form-progress">
     <% for (let s = 1; s <= 4; s++) { %>
@@ -18,28 +26,28 @@
 
       <div class="form-field<%= errors.firstName ? ' has-error' : '' %>">
         <label>First Name *</label>
-        <input type="text" name="firstName" value="<%- fields.firstName %>" data-field="firstName"
+        <input type="text" name="firstName" value="<%= fields.firstName %>" data-field="firstName"
           hx-swap="none" />
         <% if (errors.firstName) { %><span class="error" data-role="error">First Name is required</span><% } %>
       </div>
 
       <div class="form-field<%= errors.lastName ? ' has-error' : '' %>">
         <label>Last Name *</label>
-        <input type="text" name="lastName" value="<%- fields.lastName %>" data-field="lastName"
+        <input type="text" name="lastName" value="<%= fields.lastName %>" data-field="lastName"
           hx-swap="none" />
         <% if (errors.lastName) { %><span class="error" data-role="error">Last Name is required</span><% } %>
       </div>
 
       <div class="form-field<%= errors.email ? ' has-error' : '' %>">
         <label>Email *</label>
-        <input type="email" name="email" value="<%- fields.email %>" data-field="email"
+        <input type="email" name="email" value="<%= fields.email %>" data-field="email"
           hx-swap="none" />
         <% if (errors.email) { %><span class="error" data-role="error">Email is required</span><% } %>
       </div>
 
       <div class="form-field<%= errors.phone ? ' has-error' : '' %>">
         <label>Phone *</label>
-        <input type="tel" name="phone" value="<%- fields.phone %>" data-field="phone"
+        <input type="tel" name="phone" value="<%= fields.phone %>" data-field="phone"
           hx-swap="none" />
         <% if (errors.phone) { %><span class="error" data-role="error">Phone is required</span><% } %>
       </div>
@@ -47,7 +55,7 @@
       <div class="form-actions">
         <button
           data-role="next-step"
-          hx-post="<%= basePath %>/next"
+          data-replay hx-post="<%= basePath %>/next"
           hx-target="#form-content"
           hx-swap="outerHTML"
           hx-include="#form-content input"
@@ -62,14 +70,14 @@
 
       <div class="form-field<%= errors.street ? ' has-error' : '' %>">
         <label>Street *</label>
-        <input type="text" name="street" value="<%- fields.street %>" data-field="street"
+        <input type="text" name="street" value="<%= fields.street %>" data-field="street"
           hx-swap="none" />
         <% if (errors.street) { %><span class="error" data-role="error">Street is required</span><% } %>
       </div>
 
       <div class="form-field<%= errors.city ? ' has-error' : '' %>">
         <label>City *</label>
-        <input type="text" name="city" value="<%- fields.city %>" data-field="city"
+        <input type="text" name="city" value="<%= fields.city %>" data-field="city"
           hx-swap="none" />
         <% if (errors.city) { %><span class="error" data-role="error">City is required</span><% } %>
       </div>
@@ -87,7 +95,7 @@
 
       <div class="form-field<%= errors.zip ? ' has-error' : '' %>">
         <label>ZIP *</label>
-        <input type="text" name="zip" value="<%- fields.zip %>" data-field="zip"
+        <input type="text" name="zip" value="<%= fields.zip %>" data-field="zip"
           hx-swap="none" />
         <% if (errors.zip) { %><span class="error" data-role="error">ZIP is required</span><% } %>
       </div>
@@ -106,14 +114,14 @@
       <div class="form-actions">
         <button
           data-role="prev-step"
-          hx-post="<%= basePath %>/prev"
+          data-replay hx-post="<%= basePath %>/prev"
           hx-target="#form-content"
           hx-swap="outerHTML"
           hx-include="#form-content input, #form-content select"
         >Previous</button>
         <button
           data-role="next-step"
-          hx-post="<%= basePath %>/next"
+          data-replay hx-post="<%= basePath %>/next"
           hx-target="#form-content"
           hx-swap="outerHTML"
           hx-include="#form-content input, #form-content select"
@@ -128,7 +136,9 @@
 
       <div class="form-field">
         <label>Account Type *</label>
-        <select name="accountType" data-role="account-type" data-field="accountType" hx-swap="none">
+        <select name="accountType" data-role="account-type" data-field="accountType"
+          hx-get="<%= basePath %>/step" hx-trigger="change" hx-target="#form-content"
+          hx-swap="outerHTML" hx-include="#form-content input, #form-content select">
           <option value="individual" <%= fields.accountType === 'individual' ? 'selected' : '' %>>Individual</option>
           <option value="business" <%= fields.accountType === 'business' ? 'selected' : '' %>>Business</option>
         </select>
@@ -137,21 +147,21 @@
       <% if (fields.accountType === 'business') { %>
         <div class="form-field<%= errors.companyName ? ' has-error' : '' %>">
           <label>Company Name *</label>
-          <input type="text" name="companyName" value="<%- fields.companyName %>" data-field="companyName"
+          <input type="text" name="companyName" value="<%= fields.companyName %>" data-field="companyName"
             hx-swap="none" />
           <% if (errors.companyName) { %><span class="error" data-role="error">Company Name is required</span><% } %>
         </div>
 
         <div class="form-field<%= errors.taxId ? ' has-error' : '' %>">
           <label>Tax ID *</label>
-          <input type="text" name="taxId" value="<%- fields.taxId %>" data-field="taxId"
+          <input type="text" name="taxId" value="<%= fields.taxId %>" data-field="taxId"
             hx-swap="none" />
           <% if (errors.taxId) { %><span class="error" data-role="error">Tax ID is required</span><% } %>
         </div>
 
         <div class="form-field">
           <label>PO Number</label>
-          <input type="text" name="poNumber" value="<%- fields.poNumber %>" data-field="poNumber"
+          <input type="text" name="poNumber" value="<%= fields.poNumber %>" data-field="poNumber"
             hx-swap="none" />
         </div>
       <% } %>
@@ -159,14 +169,14 @@
       <div class="form-actions">
         <button
           data-role="prev-step"
-          hx-post="<%= basePath %>/prev"
+          data-replay hx-post="<%= basePath %>/prev"
           hx-target="#form-content"
           hx-swap="outerHTML"
           hx-include="#form-content input, #form-content select"
         >Previous</button>
         <button
           data-role="next-step"
-          hx-post="<%= basePath %>/next"
+          data-replay hx-post="<%= basePath %>/next"
           hx-target="#form-content"
           hx-swap="outerHTML"
           hx-include="#form-content input, #form-content select"
@@ -196,7 +206,7 @@
       <div class="form-actions">
         <button
           data-role="prev-step"
-          hx-post="<%= basePath %>/prev"
+          data-replay hx-post="<%= basePath %>/prev"
           hx-target="#form-content"
           hx-swap="outerHTML"
           hx-include="#form-content input"

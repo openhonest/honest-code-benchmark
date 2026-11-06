@@ -1,125 +1,43 @@
+import { parseSalary } from '../../lib/value-rules.js';
+
 const ROWS_PER_PAGE = 25;
 
-export class TableModel {
-  constructor(rows) {
-    this.rows = rows;
-    this.sortColumn = null;
-    this.sortDirection = null;
-    this.filterText = '';
-    this.currentPage = 1;
-    this.selectedIds = {};
-    this.editingCell = null;
-    this.editingValue = '';
+class Employee {
+  constructor(raw) {
+    this.id = raw.id;
+    this.name = raw.name;
+    this.email = raw.email;
+    this.department = raw.department;
+    this.hireDate = raw.hireDate;
+    this.salary = raw.salary;
+    this.active = raw.active;
   }
 
-  static fromData(data) {
-    return new TableModel(data);
+  static fromJSON(raw) {
+    return new Employee(raw);
   }
 
-  sort(col) {
-    if (this.sortColumn === col) {
-      if (this.sortDirection === 'asc') this.sortDirection = 'desc';
-      else { this.sortColumn = null; this.sortDirection = null; }
-    } else {
-      this.sortColumn = col;
-      this.sortDirection = 'asc';
-    }
+  matches(lowerText) {
+    return this.name.toLowerCase().includes(lowerText)
+      || this.email.toLowerCase().includes(lowerText)
+      || this.department.toLowerCase().includes(lowerText);
   }
 
-  setFilter(text) {
-    this.filterText = text;
-    this.currentPage = 1;
+  display(column) {
+    if (column === 'salary') return `$${this.salary.toLocaleString('en-US')}`;
+    if (column === 'active') return this.active ? 'Yes' : 'No';
+    return String(this[column]);
   }
 
-  setPage(p) { this.currentPage = p; }
-
-  toggleRow(id) {
-    if (this.selectedIds[id]) delete this.selectedIds[id];
-    else this.selectedIds[id] = true;
-  }
-
-  toggleAllVisible() {
-    const ids = this.getPageRows().map(r => r.id);
-    const allSelected = ids.every(id => this.selectedIds[id]);
-    if (allSelected) ids.forEach(id => delete this.selectedIds[id]);
-    else ids.forEach(id => { this.selectedIds[id] = true; });
-  }
-
-  startEditing(id, column) {
-    const row = this.rows.find(r => r.id === id);
-    this.editingCell = { id, column };
-    this.editingValue = row ? String(row[column]) : '';
-  }
-
-  setEditingValue(v) { this.editingValue = v; }
-
-  commitEdit() {
-    if (!this.editingCell) return;
-    const { id, column } = this.editingCell;
-    const row = this.rows.find(r => r.id === id);
-    if (row) {
-      row[column] = column === 'salary'
-        ? parseInt(this.editingValue, 10) || row[column]
-        : this.editingValue;
-    }
-    this.editingCell = null;
-    this.editingValue = '';
-  }
-
-  cancelEdit() {
-    this.editingCell = null;
-    this.editingValue = '';
-  }
-
-  deleteSelected() {
-    this.rows = this.rows.filter(r => !this.selectedIds[r.id]);
-    this.selectedIds = {};
-    const tp = this.getTotalPages();
-    if (this.currentPage > tp) this.currentPage = tp;
-  }
-
-  getFiltered() {
-    if (!this.filterText) return this.rows;
-    const ft = this.filterText.toLowerCase();
-    return this.rows.filter(r =>
-      r.name.toLowerCase().includes(ft) ||
-      r.email.toLowerCase().includes(ft) ||
-      r.department.toLowerCase().includes(ft)
-    );
-  }
-
-  getFilteredSorted() {
-    let rows = this.getFiltered();
-    if (this.sortColumn && this.sortDirection) {
-      const col = this.sortColumn;
-      const dir = this.sortDirection;
-      rows = [...rows].sort((a, b) => {
-        const av = a[col], bv = b[col];
-        let cmp = 0;
-        if (typeof av === 'string') cmp = av.localeCompare(bv);
-        else if (typeof av === 'boolean') cmp = av === bv ? 0 : av ? -1 : 1;
-        else cmp = av - bv;
-        return dir === 'desc' ? -cmp : cmp;
-      });
-    }
-    return rows;
-  }
-
-  getPageRows() {
-    const all = this.getFilteredSorted();
-    const start = (this.currentPage - 1) * ROWS_PER_PAGE;
-    return all.slice(start, start + ROWS_PER_PAGE);
-  }
-
-  getTotalPages() {
-    return Math.max(1, Math.ceil(this.getFilteredSorted().length / ROWS_PER_PAGE));
-  }
-
-  getTotalFiltered() {
-    return this.getFilteredSorted().length;
-  }
-
-  getSelectedCount() {
-    return Object.keys(this.selectedIds).length;
+  with(column, raw) {
+    const copy = Employee.fromJSON(this);
+    copy[column] = column === 'salary' ? (parseSalary(raw) ?? this.salary) : raw;
+    return copy;
   }
 }
+
+export function toEmployees(rows) {
+  return rows.map(Employee.fromJSON);
+}
+
+export { Employee, ROWS_PER_PAGE };

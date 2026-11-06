@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { parseSalary } from '../../lib/value-rules.js';
 
 const ROWS_PER_PAGE = 25;
 
@@ -59,7 +60,7 @@ export const useTableStore = create((set, get) => ({
     const data = s.data.map(r => {
       if (r.id !== id) return r;
       const val = column === 'salary'
-        ? parseInt(s.editingValue, 10) || r[column]
+        ? (parseSalary(s.editingValue) ?? r[column])
         : s.editingValue;
       return { ...r, [column]: val };
     });
@@ -83,13 +84,19 @@ export const useTableStore = create((set, get) => ({
     const s = get();
     let rows = filterData(s.data, s.filterText);
     if (s.sortColumn && s.sortDirection) {
+      const sign = s.sortDirection === 'desc' ? -1 : 1;
       rows = [...rows].sort((a, b) => {
         const av = a[s.sortColumn], bv = b[s.sortColumn];
         let cmp = 0;
-        if (typeof av === 'string') cmp = av.localeCompare(bv);
-        else if (typeof av === 'boolean') cmp = av === bv ? 0 : av ? -1 : 1;
-        else cmp = av - bv;
-        return s.sortDirection === 'desc' ? -cmp : cmp;
+        if (typeof av === 'string') {
+          const al = av.toLowerCase(), bl = bv.toLowerCase();
+          cmp = al < bl ? -1 : al > bl ? 1 : 0;
+        } else if (typeof av === 'boolean') {
+          cmp = av === bv ? 0 : av ? -1 : 1;
+        } else {
+          cmp = av - bv;
+        }
+        return cmp !== 0 ? sign * cmp : (a.id < b.id ? -1 : 1);
       });
     }
     return rows;

@@ -1,0 +1,113 @@
+{#- Request state travels in the hidden inputs below; every hx request includes
+    them with hx-include. No state is embedded in hx-vals, so Jinja's
+    attribute escaping cannot corrupt it. -#}
+{%- set inc = "#table-content input[type=hidden]" -%}
+<div id="table-content">
+  <input type="hidden" name="sortCol" value="{{ sort_col }}">
+  <input type="hidden" name="sortDir" value="{{ sort_dir }}">
+  <input type="hidden" name="filter" value="{{ filter_text }}">
+  <input type="hidden" name="page" value="{{ page }}">
+  <input type="hidden" name="selected" value="{{ selected_json }}">
+
+  <div class="filter-bar">
+    <input type="text"
+           name="filterInput"
+           placeholder="Filter by name, email, or department..."
+           value="{{ filter_text }}"
+           data-role="filter-input"
+           hx-get="{{ base_path }}/filter"
+           hx-trigger="input changed delay:300ms"
+           hx-target="#table-content"
+           hx-swap="outerHTML"
+           hx-include="{{ inc }}">
+  </div>
+
+  <div class="toolbar">
+    <span class="selection-count">{{ sel_count }} of {{ total_rows }} selected</span>
+    <button class="danger"
+            data-action="delete-selected"
+            {% if sel_count == 0 %}disabled{% endif %}
+            hx-post="{{ base_path }}/delete"
+            hx-target="#table-content"
+            hx-swap="outerHTML"
+            hx-include="{{ inc }}">Delete selected</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>
+          <input type="checkbox"
+                 data-role="select-all"
+                 {% if all_visible_selected %}checked{% endif %}
+                 data-replay hx-post="{{ base_path }}/toggle-all"
+                 hx-target="#table-content"
+                 hx-swap="outerHTML"
+                 hx-include="{{ inc }}">
+        </th>
+        {% for col in columns %}
+        <th data-column="{{ col.key }}"
+            hx-get="{{ base_path }}/sort?col={{ col.key }}"
+            hx-target="#table-content"
+            hx-swap="outerHTML"
+            hx-include="{{ inc }}"
+            style="cursor:pointer">
+          {{ col.label }}
+          <span class="sort-indicator{% if sort_col == col.key %} active{% endif %}">
+            {%- if sort_col != col.key %}↕{% elif sort_dir == 'asc' %}↑{% else %}↓{% endif -%}
+          </span>
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr data-row="{{ row.id }}" class="{% if row.id in selected_ids %}selected{% endif %}">
+        <td>
+          <input type="checkbox"
+                 data-role="row-checkbox"
+                 {% if row.id in selected_ids %}checked{% endif %}
+                 data-replay hx-post="{{ base_path }}/toggle?id={{ row.id }}"
+                 hx-target="#table-content"
+                 hx-swap="outerHTML"
+                 hx-include="{{ inc }}">
+        </td>
+        {% for col in columns %}
+        <td data-column="{{ col.key }}"
+            {% if col.key in editable %}
+            hx-get="{{ base_path }}/edit-cell?id={{ row.id }}&col={{ col.key }}"
+            hx-trigger="dblclick"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-include="{{ inc }}"
+            {% endif %}>
+          {%- if col.key == 'salary' -%}
+          {{ usd(row.salary) }}
+          {%- elif col.key == 'active' -%}
+          {{ 'Yes' if row.active else 'No' }}
+          {%- else -%}
+          {{ row[col.key] }}
+          {%- endif -%}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="pagination">
+    <button data-action="prev-page"
+            {% if page <= 1 %}disabled{% endif %}
+            hx-get="{{ base_path }}/page?p={{ page - 1 }}"
+            hx-target="#table-content"
+            hx-swap="outerHTML"
+            hx-include="{{ inc }}">Previous</button>
+    <span class="page-info" data-role="page-info">Page {{ page }} of {{ total_pages }}</span>
+    <button data-action="next-page"
+            {% if page >= total_pages %}disabled{% endif %}
+            hx-get="{{ base_path }}/page?p={{ page + 1 }}"
+            hx-target="#table-content"
+            hx-swap="outerHTML"
+            hx-include="{{ inc }}">Next</button>
+  </div>
+</div>

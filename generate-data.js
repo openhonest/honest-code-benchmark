@@ -14,7 +14,9 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, 'data');
+// DATA_OUT_DIR lets a reproduction write to a scratch directory and diff it
+// against the checked-in files.
+const DATA_DIR = process.env.DATA_OUT_DIR || join(__dirname, 'data');
 
 const SEED = '6a1624e0-f793-442a-9f45-a3b80ba2419e';
 const SIZES = [100, 1000, 10000, 50000, 100000];
@@ -120,8 +122,8 @@ function randFloat(rng, min, max, decimals = 2) {
 }
 
 function randDate(rng, startYear, endYear) {
-  const start = new Date(startYear, 0, 1).getTime();
-  const end = new Date(endYear, 11, 31).getTime();
+  const start = Date.UTC(startYear, 0, 1);
+  const end = Date.UTC(endYear, 11, 31);
   const d = new Date(start + rng() * (end - start));
   return d.toISOString().split('T')[0];
 }

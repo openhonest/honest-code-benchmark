@@ -63,3 +63,27 @@ export function toggle_all_visible(selected, ids) {
   else ids.forEach(id => { next[id] = true; });
   return next;
 }
+
+// Server view: the shared client's first render (all categories, page 1,
+// nothing selected, no cell in edit).
+export const ROWS_PER_PAGE = 25;
+export const QUARTERS = ['q1', 'q2', 'q3', 'q4'];
+export const INITIAL_STATE = { category: 'All', currentPage: 1, selected: {}, bulkQuarter: 'q1', bulkValue: '' };
+
+export function variance_class(variance) {
+  return variance < 0 ? 'over-budget' : 'under-budget';
+}
+
+export function build_view(rows, state = INITIAL_STATE) {
+  const filtered = filter_by_category(rows, state.category);
+  const page = paginate(filtered, state.currentPage, ROWS_PER_PAGE);
+  const visibleIds = page.pageRows.map(r => r.id);
+  return {
+    ...page,
+    state,
+    categories: [...new Set(rows.map(r => r.category))].sort(),
+    totals: compute_totals(filtered),
+    selCount: Object.keys(state.selected).length,
+    allVisibleSelected: visibleIds.length > 0 && visibleIds.every(id => state.selected[id]),
+  };
+}

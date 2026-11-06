@@ -5,19 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Benchmark: {{ archetype }} / {{ arm }}</title>
   <link rel="stylesheet" href="/shared/styles.css">
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="/htmx/htmx.min.js"></script>
+  <script src="/lib/htmx-replay.js" defer></script>
   <script src="/domx/domx.min.js"></script>
+  <script>window.genxConfig = { cdn: '/genx', cloak: true, cloakMarkers: [{ mark: 'fx-cloak', done: 'fx-raw' }] };</script>
+  <script src="/genx/cloak.min.js"></script>
   <script src="/genx/bootloader.min.js"></script>
-  <style>[fx-cloak]{display:none!important}</style>
 </head>
 <body>
   <div id="root">
-    <div class="app">
+    <div class="app" hx-sync="this:replace">
       {{ content_block | safe }}
+      <div hidden data-role="refresh-poller"
+        hx-sync="closest .app:drop"
+        hx-get="{{ base_path }}/refresh"
+        hx-trigger="{{ refresh_trigger }}"
+        hx-target="#dashboard-content"
+        hx-swap="outerHTML"
+        hx-include="#dashboard-content input[type=hidden]"></div>
     </div>
   </div>
   <script>
-    window.__BENCHMARK_CONFIG__ = { archetype: "{{ archetype }}", arm: "{{ arm }}", rows: {{ data_rows }} };
+    window.__BENCHMARK_CONFIG__ = { archetype: "{{ archetype }}", arm: "{{ arm }}", rows: {{ data_rows }}, refreshSeconds: {{ refresh_seconds }} };
   </script>
 </body>
 </html>

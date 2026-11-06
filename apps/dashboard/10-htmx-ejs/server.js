@@ -2,10 +2,13 @@ import ejs from 'ejs';
 import { Router } from 'express';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { openDashboardDb } from '../../lib/sqlite.js';
+import { createTimer } from '../../lib/timing.js';
+import { route, intParam, strParam, selectionParam, sendTimed, BadRequest } from '../../lib/http-util.js';
+import { formatUpdated, REFRESH_EVENT, DEFAULT_REFRESH_SECONDS } from '../../lib/dashboard-refresh.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VIEWS = join(__dirname, 'views');
-const ROWS_PER_PAGE = 25;
 
 const COLUMNS = [
   { key: 'id', label: 'Order ID' },
@@ -17,45 +20,43 @@ const COLUMNS = [
   { key: 'items', label: 'Items' },
 ];
 
-let dashboardData = [];
+let db = null;
 
-function filterRows(rows, category, status, dateFrom, dateTo) {
-  let out = rows;
-  if (category && category !== 'All') out = out.filter(r => r.category === category);
-  if (status && status !== 'All') out = out.filter(r => r.status === status);
-  if (dateFrom) out = out.filter(r => r.date >= dateFrom);
-  if (dateTo) out = out.filter(r => r.date <= dateTo);
-  return out;
+// The poller's trigger: every N seconds, plus the page-wide refresh event the
+// harness dispatches on <body>. N = 0 leaves only the event.
+function refreshTrigger(seconds) {
+  const onEvent = `${REFRESH_EVENT} from:body`;
+  return seconds > 0 ? `every ${seconds}s, ${onEvent}` : onEvent;
 }
 
-function sortRows(rows, col, dir) {
-  if (!col || !dir) return rows;
-  return [...rows].sort((a, b) => {
-    const av = a[col], bv = b[col];
-    let cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
-    return dir === 'desc' ? -cmp : cmp;
-  });
+async function renderContent(state, basePath, timer = createTimer()) {
+  const { sortCol, sortDir, category, status, dateFrom, dateTo, page } = state;
+  const { result, categories, statuses, loadedAt } = timer.time('load', () => ({
+    result: db.page({ category, status, dateFrom, dateTo, col: sortCol, dir: sortDir, page }),
+    categories: db.categories(),
+    statuses: db.statuses(),
+    loadedAt: new Date().toISOString(),
+  }));
+  const metrics = {
+    totalOrders: result.total,
+    totalRevenue: result.totalRevenue,
+    avgOrder: result.avgOrder,
+    uniqueCustomers: result.uniqueCustomers,
+  };
+  return timer.timeAsync('render', () => ejs.renderFile(join(VIEWS, '_content.ejs'), {
+    rows: result.rows,
+    totalRows: result.total,
+    totalPages: result.totalPages,
+    page: result.page,
+    metrics, categories, statuses,
+    sortCol, sortDir, category, status, dateFrom, dateTo,
+    columns: COLUMNS, basePath, loadedAt, updatedText: formatUpdated(loadedAt),
+  }, { cache: true }));
 }
 
-function computeMetrics(rows) {
-  const totalOrders = rows.length;
-  const totalRevenue = rows.reduce((s, r) => s + r.amount, 0);
-  const avgOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-  const uniqueCustomers = new Set(rows.map(r => r.customerName)).size;
-  return { totalOrders, totalRevenue, avgOrder, uniqueCustomers };
-}
-
-function computeView(sortCol, sortDir, category, status, dateFrom, dateTo, page) {
-  const filtered = filterRows(dashboardData, category, status, dateFrom, dateTo);
-  const sorted = sortRows(filtered, sortCol, sortDir);
-  const metrics = computeMetrics(filtered);
-  const totalRows = sorted.length;
-  const totalPages = Math.max(1, Math.ceil(totalRows / ROWS_PER_PAGE));
-  const p = Math.min(Math.max(1, page), totalPages);
-  const pageRows = sorted.slice((p - 1) * ROWS_PER_PAGE, p * ROWS_PER_PAGE);
-  const categories = [...new Set(dashboardData.map(r => r.category))].sort();
-  const statuses = [...new Set(dashboardData.map(r => r.status))].sort();
-  return { pageRows, totalRows, totalPages, page: p, metrics, categories, statuses };
+async function sendContent(res, state, basePath) {
+  const timer = createTimer();
+  sendTimed(res, timer, await renderContent(state, basePath, timer));
 }
 
 function parseState(query, body) {
@@ -67,29 +68,43 @@ function parseState(query, body) {
     status: src.status || 'All',
     dateFrom: src.dateFrom || '',
     dateTo: src.dateTo || '',
-    page: parseInt(src.page, 10) || 1,
+    page: intParam(src.page, 'page'),
   };
 }
 
-async function renderContent(state, basePath) {
-  const { sortCol, sortDir, category, status, dateFrom, dateTo, page } = state;
-  const view = computeView(sortCol, sortDir, category, status, dateFrom, dateTo, page);
-  return ejs.renderFile(join(VIEWS, '_content.ejs'), {
-    ...view, rows: view.pageRows,
-    sortCol, sortDir, category, status, dateFrom, dateTo,
-    columns: COLUMNS, basePath,
-  });
-}
+const readOnly = new Map();
 
-export async function render(data, opts) {
-  dashboardData = [...data];
+// Opening the database is setup and is not timed. One read-only connection
+// per data size is kept for the life of the server.
+export async function render(sqlitePath, opts, timer = createTimer()) {
+  if (!readOnly.has(sqlitePath)) readOnly.set(sqlitePath, openDashboardDb(sqlitePath));
+  db = readOnly.get(sqlitePath);
+  const { result, categories, statuses, loadedAt } = timer.time('load', () => ({
+    result: db.page({ category: 'All', status: 'All', dateFrom: '', dateTo: '', col: '', dir: '', page: 1 }),
+    categories: db.categories(),
+    statuses: db.statuses(),
+    loadedAt: new Date().toISOString(),
+  }));
+  const refreshSeconds = opts.refreshSeconds ?? DEFAULT_REFRESH_SECONDS;
   const basePath = `/${opts.archetype}/10-htmx-ejs`;
-  const view = computeView('', '', 'All', 'All', '', '', 1);
-  return ejs.renderFile(join(VIEWS, 'page.ejs'), {
-    ...view,
-    sortCol: '', sortDir: '', category: 'All', status: 'All', dateFrom: '', dateTo: '',
-    columns: COLUMNS, basePath,
-    archetype: opts.archetype, arm: opts.arm, dataRows: opts.rows,
+  return timer.timeAsync('render', () => {
+    const metrics = {
+      totalOrders: result.total,
+      totalRevenue: result.totalRevenue,
+      avgOrder: result.avgOrder,
+      uniqueCustomers: result.uniqueCustomers,
+    };
+    return ejs.renderFile(join(VIEWS, 'page.ejs'), {
+      pageRows: result.rows,
+      totalRows: result.total,
+      totalPages: result.totalPages,
+      page: result.page,
+      metrics, categories, statuses,
+      sortCol: '', sortDir: '', category: 'All', status: 'All', dateFrom: '', dateTo: '',
+      columns: COLUMNS, basePath, loadedAt, updatedText: formatUpdated(loadedAt),
+      refreshSeconds, refreshTrigger: refreshTrigger(refreshSeconds),
+      archetype: opts.archetype, arm: opts.arm, dataRows: opts.rows,
+    }, { cache: true });
   });
 }
 
@@ -97,7 +112,7 @@ export function partialRouter(dataDir, archetype) {
   const router = Router();
   const basePath = `/${archetype}/10-htmx-ejs`;
 
-  router.get('/sort', async (req, res) => {
+  router.get('/sort', route(async (req, res) => {
     const state = parseState(req.query);
     const col = req.query.col;
     if (state.sortCol === col) {
@@ -107,24 +122,31 @@ export function partialRouter(dataDir, archetype) {
       state.sortCol = col;
       state.sortDir = 'asc';
     }
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
-  router.get('/filter', async (req, res) => {
+  router.get('/filter', route(async (req, res) => {
     const state = parseState(req.query);
     if (req.query.categoryInput !== undefined) state.category = req.query.categoryInput;
     if (req.query.statusInput !== undefined) state.status = req.query.statusInput;
     if (req.query.dateFromInput !== undefined) state.dateFrom = req.query.dateFromInput;
     if (req.query.dateToInput !== undefined) state.dateTo = req.query.dateToInput;
     state.page = 1;
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
-  router.get('/page', async (req, res) => {
+  // Auto-refresh: re-read the current state from SQLite. The state rides in
+  // the hidden inputs and is passed back unchanged, so filters, sort and page
+  // survive (db.page clamps the page if the data shrank).
+  router.get('/refresh', route(async (req, res) => {
+    await sendContent(res, parseState(req.query), basePath);
+  }));
+
+  router.get('/page', route(async (req, res) => {
     const state = parseState(req.query);
-    state.page = parseInt(req.query.p, 10) || 1;
-    res.send(await renderContent(state, basePath));
-  });
+    state.page = intParam(req.query.p, 'p');
+    await sendContent(res, state, basePath);
+  }));
 
   return router;
 }

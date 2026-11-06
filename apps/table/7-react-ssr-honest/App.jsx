@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
-import {
-  filter_rows, sort_rows, paginate, format_cell,
-  toggle_row, toggle_all_visible, commit_edit, delete_selected,
-} from './lib.js';
+// Arm 7 server tree. Plain function component, no hooks: the view comes from
+// build_view() in lib.js and every cell from format_cell(). The browser
+// hydrates this HTML with the shared client (../shared-client/App.jsx).
+import React from 'react';
+import { format_cell, sort_indicator } from './lib.js';
 
 const COLUMNS = [
   { key: 'name', label: 'Name' },
@@ -13,146 +13,25 @@ const COLUMNS = [
   { key: 'active', label: 'Active' },
 ];
 
-const ROWS_PER_PAGE = 25;
+const noop = () => {};
 
-function EditableCell({ row, column, editingCell, editingValue, onStartEdit, onSetEditValue, onCommit, onCancel }) {
-  const isEditing = editingCell?.id === row.id && editingCell?.column === column;
-
-  const handleDoubleClick = useCallback(() => {
-    if (column === 'name' || column === 'salary') {
-      onStartEdit(row.id, column, row[column]);
-    }
-  }, [row.id, column, row[column], onStartEdit]);
-
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter') onCommit();
-    else if (e.key === 'Escape') onCancel();
-  }, [onCommit, onCancel]);
-
-  if (isEditing) {
-    return (
-      <td className="editing" data-column={column}>
-        <input
-          type="text"
-          value={editingValue}
-          onChange={e => onSetEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          autoFocus
-        />
-      </td>
-    );
-  }
-
-  return (
-    <td data-column={column} onDoubleClick={handleDoubleClick}>
-      {format_cell(column, row[column])}
-    </td>
-  );
-}
-
-export default function App({ initialData }) {
-  const [data, setData] = useState(initialData || []);
-  const [sortColumn, setSortColumn] = useState(null);
-  const [sortDirection, setSortDirection] = useState(null);
-  const [filterText, setFilterText] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [selectedIds, setSelectedIds] = useState({});
-  const [editingCell, setEditingCell] = useState(null);
-  const [editingValue, setEditingValue] = useState('');
-  const filterTimeout = useRef(null);
-
-  const filtered = useMemo(() => filter_rows(data, filterText), [data, filterText]);
-
-  const filteredSorted = useMemo(() => {
-    if (!sortColumn || !sortDirection) return filtered;
-    return sort_rows(filtered, sortColumn, sortDirection);
-  }, [filtered, sortColumn, sortDirection]);
-
-  const page = useMemo(
-    () => paginate(filteredSorted, currentPage, ROWS_PER_PAGE),
-    [filteredSorted, currentPage],
-  );
-
-  const handleSort = useCallback((col) => {
-    setSortColumn(prev => {
-      if (prev === col) {
-        setSortDirection(d => {
-          if (d === 'asc') return 'desc';
-          setSortColumn(null);
-          return null;
-        });
-        return prev;
-      }
-      setSortDirection('asc');
-      return col;
-    });
-  }, []);
-
-  const handleFilter = useCallback((e) => {
-    const value = e.target.value;
-    clearTimeout(filterTimeout.current);
-    filterTimeout.current = setTimeout(() => {
-      setFilterText(value);
-      setCurrentPage(1);
-    }, 300);
-  }, []);
-
-  const handleToggleRow = useCallback((id) => {
-    setSelectedIds(prev => toggle_row(prev, id));
-  }, []);
-
-  const handleToggleAll = useCallback(() => {
-    const ids = page.pageRows.map(r => r.id);
-    setSelectedIds(prev => toggle_all_visible(prev, ids));
-  }, [page.pageRows]);
-
-  const handleDelete = useCallback(() => {
-    setData(prev => delete_selected(prev, selectedIds));
-    setSelectedIds({});
-  }, [selectedIds]);
-
-  const handleStartEdit = useCallback((id, column, value) => {
-    setEditingCell({ id, column });
-    setEditingValue(String(value));
-  }, []);
-
-  const handleCommit = useCallback(() => {
-    if (!editingCell) return;
-    setData(prev => commit_edit(prev, { id: editingCell.id, column: editingCell.column, value: editingValue }));
-    setEditingCell(null);
-    setEditingValue('');
-  }, [editingCell, editingValue]);
-
-  const handleCancel = useCallback(() => {
-    setEditingCell(null);
-    setEditingValue('');
-  }, []);
-
-  const visibleIds = page.pageRows.map(r => r.id);
-  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds[id]);
-  const selCount = Object.keys(selectedIds).length;
-
+export default function App({ view }) {
+  const { state, pageRows, totalPages, totalFiltered, currentPage, selCount, allVisibleSelected } = view;
   return (
     <div className="app">
       <div className="filter-bar">
         <input
           type="text"
           placeholder="Filter by name, email, or department..."
-          onChange={handleFilter}
           data-role="filter-input"
         />
       </div>
 
       <div className="toolbar">
         <span className="selection-count">
-          {selCount} of {filteredSorted.length} selected
+          {selCount} of {totalFiltered} selected
         </span>
-        <button
-          className="danger"
-          onClick={handleDelete}
-          disabled={selCount === 0}
-          data-action="delete-selected"
-        >
+        <button className="danger" disabled={selCount === 0} data-action="delete-selected">
           Delete selected
         </button>
       </div>
@@ -161,46 +40,26 @@ export default function App({ initialData }) {
         <thead>
           <tr>
             <th>
-              <input
-                type="checkbox"
-                checked={allVisibleSelected}
-                onChange={handleToggleAll}
-                data-role="select-all"
-              />
+              <input type="checkbox" checked={allVisibleSelected} onChange={noop} data-role="select-all" />
             </th>
             {COLUMNS.map(col => (
-              <th key={col.key} data-column={col.key} onClick={() => handleSort(col.key)}>
+              <th key={col.key} data-column={col.key}>
                 {col.label}
-                <span className={`sort-indicator${sortColumn === col.key ? ' active' : ''}`}>
-                  {sortColumn !== col.key ? '↕' : sortDirection === 'asc' ? '↑' : '↓'}
+                <span className={`sort-indicator${state.sortCol === col.key ? ' active' : ''}`}>
+                  {sort_indicator(state, col.key)}
                 </span>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {page.pageRows.map(row => (
-            <tr key={row.id} className={selectedIds[row.id] ? 'selected' : ''} data-row={row.id}>
+          {pageRows.map(row => (
+            <tr key={row.id} className={state.selected[row.id] ? 'selected' : ''} data-row={row.id}>
               <td>
-                <input
-                  type="checkbox"
-                  checked={!!selectedIds[row.id]}
-                  onChange={() => handleToggleRow(row.id)}
-                  data-role="row-checkbox"
-                />
+                <input type="checkbox" checked={!!state.selected[row.id]} onChange={noop} data-role="row-checkbox" />
               </td>
               {COLUMNS.map(col => (
-                <EditableCell
-                  key={col.key}
-                  row={row}
-                  column={col.key}
-                  editingCell={editingCell}
-                  editingValue={editingValue}
-                  onStartEdit={handleStartEdit}
-                  onSetEditValue={setEditingValue}
-                  onCommit={handleCommit}
-                  onCancel={handleCancel}
-                />
+                <td key={col.key} data-column={col.key}>{format_cell(col.key, row[col.key])}</td>
               ))}
             </tr>
           ))}
@@ -208,21 +67,13 @@ export default function App({ initialData }) {
       </table>
 
       <div className="pagination">
-        <button
-          onClick={() => setCurrentPage(p => p - 1)}
-          disabled={currentPage <= 1}
-          data-action="prev-page"
-        >
+        <button disabled={currentPage <= 1} data-action="prev-page">
           Previous
         </button>
         <span className="page-info" data-role="page-info">
-          Page {currentPage} of {page.totalPages}
+          Page {currentPage} of {totalPages}
         </span>
-        <button
-          onClick={() => setCurrentPage(p => p + 1)}
-          disabled={currentPage >= page.totalPages}
-          data-action="next-page"
-        >
+        <button disabled={currentPage >= totalPages} data-action="next-page">
           Next
         </button>
       </div>

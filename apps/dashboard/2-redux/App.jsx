@@ -4,6 +4,7 @@ import {
   setData, setCategoryFilter, setStatusFilter, setDateFrom, setDateTo, sort, setPage,
   selectFiltered, selectPageRows, selectTotalPages,
 } from './store.js';
+import { formatUpdated, subscribeRefresh, refetchRows } from '../../lib/dashboard-refresh.js';
 
 const COLUMNS = [
   { key: 'id', label: 'Order ID' },
@@ -25,13 +26,17 @@ export default function App() {
   const sortColumn = useSelector(s => s.dashboard.sortColumn);
   const sortDirection = useSelector(s => s.dashboard.sortDirection);
   const currentPage = useSelector(s => s.dashboard.currentPage);
+  const lastUpdated = useSelector(s => s.dashboard.lastUpdated);
   const filtered = useSelector(selectFiltered);
   const pageRows = useSelector(selectPageRows);
   const totalPages = useSelector(selectTotalPages);
 
   useEffect(() => {
     const config = window.__BENCHMARK_CONFIG__;
-    fetch(config.dataUrl).then(r => r.json()).then(d => dispatch(setData(d)));
+    fetch(config.dataUrl).then(r => r.json()).then(rows => dispatch(setData({ rows, at: new Date().toISOString() })));
+    return subscribeRefresh(() => {
+      refetchRows(config.dataUrl).then(rows => dispatch(setData({ rows, at: new Date().toISOString() })));
+    });
   }, [dispatch]);
 
   const categories = useMemo(() => [...new Set(data.map(r => r.category))].sort(), [data]);
@@ -45,6 +50,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="last-updated">Last updated <time data-role="last-updated" dateTime={lastUpdated}>{formatUpdated(lastUpdated)}</time></div>
       <div className="dashboard-cards">
         <div className="card"><div className="card-label">Total Orders</div><div className="card-value" data-role="total-orders">{filtered.length}</div></div>
         <div className="card"><div className="card-label">Total Revenue</div><div className="card-value" data-role="total-revenue">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>

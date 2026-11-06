@@ -7,7 +7,11 @@
     "build:stub": "node stub/build.js",
     "start:stub": "node stub/server.js",
     "validate": "node src/runner.js --validate",
-    "run": "node src/runner.js"
+    "check": "node src/runner.js --check",
+    "run": "node src/runner.js --full"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
     "express": "^4.21.0",

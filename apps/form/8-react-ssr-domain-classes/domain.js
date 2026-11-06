@@ -1,83 +1,27 @@
-const REQUIRED = {
-  1: ['firstName', 'lastName', 'email', 'phone'],
-  2: ['street', 'city', 'state', 'zip', 'country'],
-  3: ['accountType'],
-};
-
-const EMPTY_FIELDS = {
-  firstName: '', lastName: '', email: '', phone: '',
-  street: '', city: '', state: '', zip: '', country: '',
-  accountType: 'individual', companyName: '', taxId: '', poNumber: '',
-};
-
-export class FormModel {
-  constructor() {
-    this.fields = { ...EMPTY_FIELDS };
-    this.step = 1;
-    this.errors = {};
+class Customer {
+  constructor(raw) {
+    this.firstName = raw.firstName || '';
+    this.lastName = raw.lastName || '';
+    this.email = raw.email || '';
+    this.phone = raw.phone || '';
+    this.street = raw.street || '';
+    this.city = raw.city || '';
+    this.state = raw.state || '';
+    this.zip = raw.zip || '';
+    this.country = raw.country || '';
+    this.accountType = raw.accountType || 'individual';
+    this.companyName = raw.companyName || '';
+    this.taxId = raw.taxId || '';
+    this.poNumber = raw.poNumber || '';
   }
 
-  static fromData(data) {
-    const m = new FormModel();
-    if (data && data[0]) m.prefill(data[0]);
-    return m;
-  }
+  static fromJSON(raw) { return new Customer(raw); }
 
-  prefill(rec) {
-    this.fields = {
-      firstName: rec.firstName || '',
-      lastName: rec.lastName || '',
-      email: rec.email || '',
-      phone: rec.phone || '',
-      street: rec.street || '',
-      city: rec.city || '',
-      state: rec.state || '',
-      zip: rec.zip || '',
-      country: rec.country || '',
-      accountType: rec.accountType || 'individual',
-      companyName: rec.companyName || '',
-      taxId: rec.taxId || '',
-      poNumber: rec.poNumber || '',
-    };
-  }
-
-  setField(name, value) {
-    this.fields[name] = value;
-    if (this.errors[name]) {
-      const next = { ...this.errors };
-      delete next[name];
-      this.errors = next;
-    }
-  }
-
-  validate(stepNum) {
-    const required = REQUIRED[stepNum] || [];
-    const newErrors = {};
-    for (const f of required) {
-      if (!this.fields[f]?.trim()) newErrors[f] = true;
-    }
-    if (stepNum === 3 && this.fields.accountType === 'business') {
-      if (!this.fields.companyName?.trim()) newErrors.companyName = true;
-      if (!this.fields.taxId?.trim()) newErrors.taxId = true;
-    }
-    this.errors = newErrors;
-    return Object.keys(newErrors).length === 0;
-  }
-
-  nextStep() {
-    if (this.validate(this.step)) this.step++;
-  }
-
-  prevStep() {
-    this.errors = {};
-    this.step--;
-  }
-
-  isBusiness() {
-    return this.fields.accountType === 'business';
-  }
-
-  submit() {
-    return { ...this.fields };
-  }
+  display(field) { return String(this[field]); }
 }
+
+export function toCustomer(data) {
+  return data[0] ? Customer.fromJSON(data[0]) : new Customer({});
+}
+
+export { Customer };

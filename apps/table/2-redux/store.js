@@ -1,4 +1,5 @@
 import { configureStore, createSlice } from '@reduxjs/toolkit';
+import { parseSalary } from '../../lib/value-rules.js';
 
 const ROWS_PER_PAGE = 25;
 
@@ -77,7 +78,7 @@ const tableSlice = createSlice({
       const row = state.data.find(r => r.id === id);
       if (row) {
         row[column] = column === 'salary'
-          ? parseInt(state.editingValue, 10) || row[column]
+          ? (parseSalary(state.editingValue) ?? row[column])
           : state.editingValue;
       }
       state.editingCell = null;
@@ -122,14 +123,20 @@ export function selectFilteredSorted(state) {
 
   const { sortColumn, sortDirection } = state.table;
   if (sortColumn && sortDirection) {
+    const sign = sortDirection === 'desc' ? -1 : 1;
     rows = [...rows].sort((a, b) => {
       const av = a[sortColumn];
       const bv = b[sortColumn];
       let cmp = 0;
-      if (typeof av === 'string') cmp = av.localeCompare(bv);
-      else if (typeof av === 'boolean') cmp = (av === bv ? 0 : av ? -1 : 1);
-      else cmp = av - bv;
-      return sortDirection === 'desc' ? -cmp : cmp;
+      if (typeof av === 'string') {
+        const al = av.toLowerCase(), bl = bv.toLowerCase();
+        cmp = al < bl ? -1 : al > bl ? 1 : 0;
+      } else if (typeof av === 'boolean') {
+        cmp = av === bv ? 0 : av ? -1 : 1;
+      } else {
+        cmp = av - bv;
+      }
+      return cmp !== 0 ? sign * cmp : (a.id < b.id ? -1 : 1);
     });
   }
 

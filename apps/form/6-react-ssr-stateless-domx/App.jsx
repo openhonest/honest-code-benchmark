@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { collect, apply, observe } from 'stateless-dataos';
 
 const COUNTRIES = ['US','CA','MX','GB','DE','FR','JP','AU','BR','IN'];
 const US_STATES = [
@@ -19,15 +20,25 @@ const EMPTY_FIELDS = {
   accountType: 'individual', companyName: '', taxId: '', poNumber: '',
 };
 
-let domxModule = null;
 const stateManifest = {
   step:   { selector: '#form-state', read: 'data:step',   write: 'data:step' },
   fields: { selector: '#form-state', read: 'data:fields', write: 'data:fields' },
   errors: { selector: '#form-state', read: 'data:errors', write: 'data:errors' },
 };
 
+// The DOM element #form-state is the single source of truth. Writes go
+// through domx apply(); every handler reads the current state back from the
+// DOM, so a second input event that arrives before React re-renders does
+// not overwrite the first with a stale copy.
+let notify = null;
+
 function writeState(updates) {
-  if (domxModule) domxModule.apply(stateManifest, updates);
+  apply(stateManifest, updates);
+  if (notify) notify();
+}
+
+function readState() {
+  return collect(stateManifest);
 }
 
 function parseJSON(str, fallback) {
@@ -35,27 +46,20 @@ function parseJSON(str, fallback) {
   try { return JSON.parse(str); } catch { return fallback; }
 }
 
+// SSR-safe version of useDomState: the server render and the first client
+// render use the initial values; the DOM is read only after hydration.
 function useDomStateSSR(manifest) {
   const [domState, setDomState] = useState({});
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    import('stateless-dataos').then(mod => {
-      domxModule = mod;
-      setReady(true);
-    });
+    const sync = () => setDomState(collect(manifest));
+    notify = sync;
+    sync();
+    setReady(true);
+    const unsub = observe(manifest, sync);
+    return () => { notify = null; unsub(); };
   }, []);
-
-  useEffect(() => {
-    if (!ready || !domxModule) return;
-    const collect = () => {
-      const state = domxModule.collect(manifest);
-      setDomState(state);
-    };
-    collect();
-    const unsub = domxModule.observe(manifest, collect);
-    return unsub;
-  }, [ready]);
 
   return { domState, ready };
 }
@@ -78,6 +82,14 @@ function prefillFromRecord(rec) {
   };
 }
 
+function updateField(name, value) {
+  const current = readState();
+  const next = { ...parseJSON(current.fields, EMPTY_FIELDS), [name]: value };
+  const errs = { ...parseJSON(current.errors, {}) };
+  delete errs[name];
+  writeState({ fields: JSON.stringify(next), errors: JSON.stringify(errs) });
+}
+
 function Field({ label, name, fields, errors, type = 'text' }) {
   const hasError = errors[name];
   return (
@@ -86,12 +98,7 @@ function Field({ label, name, fields, errors, type = 'text' }) {
       <input
         type={type}
         value={fields[name]}
-        onChange={e => {
-          const next = { ...fields, [name]: e.target.value };
-          const errs = { ...errors };
-          if (errs[name]) delete errs[name];
-          writeState({ fields: JSON.stringify(next), errors: JSON.stringify(errs) });
-        }}
+        onChange={e => updateField(name, e.target.value)}
         data-field={name}
       />
       {hasError && <span className="error" data-role="error">{label} is required</span>}
@@ -106,12 +113,7 @@ function SelectField({ label, name, options, fields, errors }) {
       <label>{label} *</label>
       <select
         value={fields[name]}
-        onChange={e => {
-          const next = { ...fields, [name]: e.target.value };
-          const errs = { ...errors };
-          if (errs[name]) delete errs[name];
-          writeState({ fields: JSON.stringify(next), errors: JSON.stringify(errs) });
-        }}
+        onChange={e => updateField(name, e.target.value)}
         data-field={name}
       >
         <option value="">Select...</option>
@@ -124,14 +126,13 @@ function SelectField({ label, name, options, fields, errors }) {
 
 export default function App({ initialData }) {
   const { domState, ready } = useDomStateSSR(stateManifest);
-  const hydrated = useRef(false);
-
-  // Synchronous prefill for SSR: set initial field values from data
-  let initialFields = EMPTY_FIELDS;
-  if (initialData?.[0] && !hydrated.current) {
-    initialFields = prefillFromRecord(initialData[0]);
-    hydrated.current = true;
+  // Prefill from the first record, computed once so that later renders
+  // (and the seeding effect below) see the same values the server rendered.
+  const initialRef = useRef(null);
+  if (initialRef.current === null) {
+    initialRef.current = initialData?.[0] ? prefillFromRecord(initialData[0]) : EMPTY_FIELDS;
   }
+  const initialFields = initialRef.current;
 
   const step = ready ? (parseInt(domState.step, 10) || 1) : 1;
   const fields = ready ? parseJSON(domState.fields, initialFields) : initialFields;
@@ -155,46 +156,38 @@ export default function App({ initialData }) {
     }
   }, [initialData]);
 
-  // Seed DOM state once stateless-dataos loads
-  useEffect(() => {
-    if (ready) {
-      writeState({
-        step: '1',
-        fields: JSON.stringify(initialFields),
-        errors: '{}',
-      });
-    }
-  }, [ready]);
-
-  const validate = useCallback((stepNum) => {
-    const required = REQUIRED[stepNum] || [];
-    const newErrors = {};
-    for (const f of required) {
-      if (!fields[f]?.trim()) newErrors[f] = true;
-    }
-    if (stepNum === 3 && fields.accountType === 'business') {
-      if (!fields.companyName?.trim()) newErrors.companyName = true;
-      if (!fields.taxId?.trim()) newErrors.taxId = true;
-    }
-    return newErrors;
-  }, [fields]);
+  // The server already rendered #form-state with the initial values, so
+  // there is nothing to seed after hydration.
 
   const handleNext = useCallback(() => {
-    const newErrors = validate(step);
+    const current = readState();
+    const stepNum = parseInt(current.step, 10) || 1;
+    const f = parseJSON(current.fields, initialFields);
+    const required = REQUIRED[stepNum] || [];
+    const newErrors = {};
+    for (const key of required) {
+      if (!f[key]?.trim()) newErrors[key] = true;
+    }
+    if (stepNum === 3 && f.accountType === 'business') {
+      if (!f.companyName?.trim()) newErrors.companyName = true;
+      if (!f.taxId?.trim()) newErrors.taxId = true;
+    }
     if (Object.keys(newErrors).length > 0) {
       writeState({ errors: JSON.stringify(newErrors) });
     } else {
-      writeState({ step: String(step + 1), errors: '{}' });
+      writeState({ step: String(stepNum + 1), errors: '{}' });
     }
-  }, [step, validate]);
+  }, []);
 
   const handlePrev = useCallback(() => {
-    writeState({ step: String(step - 1), errors: '{}' });
-  }, [step]);
+    const stepNum = parseInt(readState().step, 10) || 1;
+    writeState({ step: String(Math.max(stepNum - 1, 1)), errors: '{}' });
+  }, []);
 
   const handleSubmit = useCallback(() => {
-    document.dispatchEvent(new CustomEvent('benchmark:form-submit', { detail: fields }));
-  }, [fields]);
+    const detail = parseJSON(readState().fields, initialFields);
+    document.dispatchEvent(new CustomEvent('benchmark:form-submit', { detail }));
+  }, []);
 
   return (
     <div className="app">
@@ -246,10 +239,7 @@ export default function App({ initialData }) {
             <label>Account Type *</label>
             <select
               value={fields.accountType}
-              onChange={e => {
-                const next = { ...fields, accountType: e.target.value };
-                writeState({ fields: JSON.stringify(next) });
-              }}
+              onChange={e => updateField('accountType', e.target.value)}
               data-role="account-type"
               data-field="accountType"
             >

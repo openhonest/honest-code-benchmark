@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useRef, useMemo } from 'react';
 import { useDomState, apply } from 'stateless-dataos';
+import { parseSalary } from '../../lib/value-rules.js';
 
 const COLUMNS = [
   { key: 'name', label: 'Name' },
@@ -57,7 +58,7 @@ function EditableCell({ row, column, editingCell, editingValue }) {
         const target = rowData.find(r => r.id === cell.id);
         if (target) {
           target[cell.column] = cell.column === 'salary'
-            ? parseInt(editingValue, 10) || target[cell.column]
+            ? (parseSalary(editingValue) ?? target[cell.column])
             : editingValue;
         }
       }
@@ -125,13 +126,19 @@ export default function App() {
       );
     }
     if (sortCol && sortDir) {
+      const sign = sortDir === 'desc' ? -1 : 1;
       rows = [...rows].sort((a, b) => {
         const av = a[sortCol], bv = b[sortCol];
         let cmp = 0;
-        if (typeof av === 'string') cmp = av.localeCompare(bv);
-        else if (typeof av === 'boolean') cmp = av === bv ? 0 : av ? -1 : 1;
-        else cmp = av - bv;
-        return sortDir === 'desc' ? -cmp : cmp;
+        if (typeof av === 'string') {
+          const al = av.toLowerCase(), bl = bv.toLowerCase();
+          cmp = al < bl ? -1 : al > bl ? 1 : 0;
+        } else if (typeof av === 'boolean') {
+          cmp = av === bv ? 0 : av ? -1 : 1;
+        } else {
+          cmp = av - bv;
+        }
+        return cmp !== 0 ? sign * cmp : (a.id < b.id ? -1 : 1);
       });
     }
     return rows;

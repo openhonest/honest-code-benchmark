@@ -4,7 +4,7 @@
   <input type="hidden" name="search" value="<%= search %>" />
   <input type="hidden" name="statusFilter" value="<%= statusFilter %>" />
   <input type="hidden" name="page" value="<%= page %>" />
-  <input type="hidden" name="selectedId" value="<%= selectedId %>" />
+  <input type="hidden" name="selectedId" value="<%= selectedId || '' %>" />
 
   <div class="filter-bar">
     <input
@@ -14,7 +14,7 @@
       value="<%= search %>"
       data-role="search-input"
       hx-get="<%= basePath %>/search"
-      hx-trigger="keyup changed delay:300ms"
+      hx-trigger="input changed delay:300ms"
       hx-target="#browser-content"
       hx-swap="outerHTML"
       hx-include="#browser-content input[type=hidden]"
@@ -68,7 +68,7 @@
         <tbody>
           <% rows.forEach(function(row) { %>
             <tr data-row="<%= row.id %>"
-                class="<%= String(selectedId) === String(row.id) ? 'selected' : '' %>"
+                class="<%= selectedId === row.id ? 'selected' : '' %>"
                 style="cursor: pointer"
                 hx-get="<%= basePath %>/select?id=<%= row.id %>"
                 hx-target="#browser-content"
@@ -78,7 +78,7 @@
               <td data-column="name"><%= row.name %></td>
               <td data-column="status"><span class="badge badge-<%= row.status %>"><%= row.status %></span></td>
               <td data-column="createdDate"><%= row.createdDate %></td>
-              <td data-column="value">$<%= row.value.toLocaleString() %></td>
+              <td data-column="value">$<%= row.value.toLocaleString('en-US') %></td>
             </tr>
           <% }) %>
         </tbody>

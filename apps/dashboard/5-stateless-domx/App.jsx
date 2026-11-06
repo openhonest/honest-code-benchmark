@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import { useDomState, apply } from 'stateless-dataos';
+import { formatUpdated, subscribeRefresh, refetchRows } from '../../lib/dashboard-refresh.js';
 
 const COLUMNS = [
   { key: 'id', label: 'Order ID' },
@@ -21,6 +22,7 @@ const stateManifest = {
   sortCol:        { selector: '#dashboard-state', read: 'data:sortCol',        write: 'data:sortCol' },
   sortDir:        { selector: '#dashboard-state', read: 'data:sortDir',        write: 'data:sortDir' },
   page:           { selector: '#dashboard-state', read: 'data:page',           write: 'data:page' },
+  lastUpdated:    { selector: '#dashboard-state', read: 'data:lastUpdated',    write: 'data:lastUpdated' },
 };
 
 let rowData = [];
@@ -37,13 +39,20 @@ export default function App() {
   const sortCol = domState.sortCol || null;
   const sortDir = domState.sortDir || null;
   const currentPage = parseInt(domState.page, 10) || 1;
+  // The rows live outside React; the timestamp in the DOM marks each load,
+  // so it doubles as the data version for the memos below.
+  const lastUpdated = domState.lastUpdated || '';
 
   useEffect(() => {
     const config = window.__BENCHMARK_CONFIG__;
-    fetch(config.dataUrl).then(r => r.json()).then(data => {
+    const load = data => {
       rowData = data;
-      writeState({ page: '1' });
-    });
+      writeState({ lastUpdated: new Date().toISOString() });
+    };
+    fetch(config.dataUrl).then(r => r.json()).then(load);
+    // A refresh swaps the rows and the timestamp only; filters, sort and
+    // page stay in the DOM untouched.
+    return subscribeRefresh(() => { refetchRows(config.dataUrl).then(load); });
   }, []);
 
   const filtered = useMemo(() => {
@@ -53,14 +62,21 @@ export default function App() {
     if (dateFrom) rows = rows.filter(r => r.date >= dateFrom);
     if (dateTo) rows = rows.filter(r => r.date <= dateTo);
     return rows;
-  }, [categoryFilter, statusFilter, dateFrom, dateTo, rowData.length]);
+  }, [categoryFilter, statusFilter, dateFrom, dateTo, lastUpdated]);
 
   const sorted = useMemo(() => {
     if (!sortCol || !sortDir) return filtered;
+    const sign = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => {
       const av = a[sortCol], bv = b[sortCol];
-      let cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
-      return sortDir === 'desc' ? -cmp : cmp;
+      let cmp = 0;
+      if (typeof av === 'string') {
+        const al = av.toLowerCase(), bl = bv.toLowerCase();
+        cmp = al < bl ? -1 : al > bl ? 1 : 0;
+      } else {
+        cmp = av - bv;
+      }
+      return cmp !== 0 ? sign * cmp : (a.id < b.id ? -1 : 1);
     });
   }, [filtered, sortCol, sortDir]);
 
@@ -71,18 +87,19 @@ export default function App() {
   const avgOrder = filtered.length > 0 ? totalRevenue / filtered.length : 0;
   const uniqueCustomers = new Set(filtered.map(r => r.customerName)).size;
 
-  const categories = useMemo(() => [...new Set(rowData.map(r => r.category))].sort(), [rowData.length]);
-  const statuses = useMemo(() => [...new Set(rowData.map(r => r.status))].sort(), [rowData.length]);
+  const categories = useMemo(() => [...new Set(rowData.map(r => r.category))].sort(), [lastUpdated]);
+  const statuses = useMemo(() => [...new Set(rowData.map(r => r.status))].sort(), [lastUpdated]);
 
   return (
     <div className="app">
       <div id="dashboard-state"
         data-category-filter="All" data-status-filter="All"
         data-date-from="" data-date-to=""
-        data-sort-col="" data-sort-dir="" data-page="1"
+        data-sort-col="" data-sort-dir="" data-page="1" data-last-updated=""
         style={{ display: 'none' }}
       />
 
+      <div className="last-updated">Last updated <time data-role="last-updated" dateTime={lastUpdated}>{formatUpdated(lastUpdated)}</time></div>
       <div className="dashboard-cards">
         <div className="card"><div className="card-label">Total Orders</div><div className="card-value" data-role="total-orders">{filtered.length}</div></div>
         <div className="card"><div className="card-label">Total Revenue</div><div className="card-value" data-role="total-revenue">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>

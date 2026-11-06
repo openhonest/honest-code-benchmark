@@ -60,7 +60,7 @@ module browser_ssr_honest
   fn filter_by_status : (rows: list<Record>, status: Status | Absent) -> list<Record>
     note "keep rows matching the given status or return all when status is all"
   fn sort_rows : (rows: list<Record>, col: ColumnKey, dir: SortDir) -> list<Record>
-    note "sort rows by the given column using the dispatch table"
+    note "sort rows by the given column using the dispatch table; ties break on ascending id"
     invokes sort_comparators
   fn paginate : (rows: list<Record>, page: int, perPage: int) -> PageResult
     note "slice the rows for the requested page and compute totals"
@@ -69,6 +69,6 @@ module browser_ssr_honest
   fn format_value : (cents: int) -> str
     note "format a numeric value as US dollar currency"
   fn compare_string : (a: str, b: str) -> int
-    note "locale-aware string comparison returning -1, 0 or 1"
+    note "ASCII lower-case string comparison (SQLite NOCASE order) returning -1, 0 or 1"
   fn compare_number : (a: int, b: int) -> int
     note "numeric comparison returning -1, 0 or 1"

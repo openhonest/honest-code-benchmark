@@ -2,10 +2,11 @@ import React, { useEffect, useMemo } from 'react';
 import { useSignals } from '@preact/signals-react/runtime';
 import {
   data, categoryFilter, statusFilter, dateFrom, dateTo,
-  sortColumn, sortDirection, currentPage,
+  sortColumn, sortDirection, currentPage, lastUpdated,
   filtered, pageRows, totalPages,
   setData, doSort,
 } from './store.js';
+import { formatUpdated, subscribeRefresh, refetchRows } from '../../lib/dashboard-refresh.js';
 
 const COLUMNS = [
   { key: 'id', label: 'Order ID' },
@@ -23,6 +24,7 @@ export default function App() {
   useEffect(() => {
     const config = window.__BENCHMARK_CONFIG__;
     fetch(config.dataUrl).then(r => r.json()).then(setData);
+    return subscribeRefresh(() => { refetchRows(config.dataUrl).then(setData); });
   }, []);
 
   const categories = useMemo(() => [...new Set(data.value.map(r => r.category))].sort(), [data.value]);
@@ -41,6 +43,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="last-updated">Last updated <time data-role="last-updated" dateTime={lastUpdated.value}>{formatUpdated(lastUpdated.value)}</time></div>
       <div className="dashboard-cards">
         <div className="card"><div className="card-label">Total Orders</div><div className="card-value" data-role="total-orders">{f.length}</div></div>
         <div className="card"><div className="card-label">Total Revenue</div><div className="card-value" data-role="total-revenue">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>

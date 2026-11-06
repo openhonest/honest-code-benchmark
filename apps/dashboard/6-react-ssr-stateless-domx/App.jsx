@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useServerPage } from '../../lib/arm6-client.js';
+import { formatUpdated, subscribeRefresh } from '../../lib/dashboard-refresh.js';
 
 const COLUMNS = [
   { key: 'id', label: 'Order ID' },
@@ -9,8 +11,6 @@ const COLUMNS = [
   { key: 'status', label: 'Status' },
   { key: 'items', label: 'Items' },
 ];
-
-const ROWS_PER_PAGE = 25;
 
 let domxModule = null;
 const stateManifest = {
@@ -52,16 +52,14 @@ function useDomStateSSR(manifest) {
   return { domState, ready };
 }
 
-let rowData = [];
+const INITIAL_QUERY = { category: 'All', status: 'All', dateFrom: '', dateTo: '', col: '', dir: '', page: '1' };
 
-export default function App({ initialData }) {
+function money(n) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export default function App({ initialPage }) {
   const { domState, ready } = useDomStateSSR(stateManifest);
-  const hydrated = useRef(false);
-
-  if (initialData && !hydrated.current) {
-    rowData = initialData;
-    hydrated.current = true;
-  }
 
   const categoryFilter = ready ? (domState.categoryFilter || 'All') : 'All';
   const statusFilter = ready ? (domState.statusFilter || 'All') : 'All';
@@ -69,50 +67,28 @@ export default function App({ initialData }) {
   const dateTo = ready ? (domState.dateTo || '') : '';
   const sortCol = ready ? (domState.sortCol || null) : null;
   const sortDir = ready ? (domState.sortDir || null) : null;
-  const currentPage = ready ? (parseInt(domState.page, 10) || 1) : 1;
+  const requestedPage = ready ? (parseInt(domState.page, 10) || 1) : 1;
+
+  // Auto-refresh re-reads the current query from SQLite. The tick only
+  // forces the refetch; filters, sort and page stay in the DOM.
+  const [refreshTick, setRefreshTick] = useState(0);
+  useEffect(() => subscribeRefresh(() => setRefreshTick(t => t + 1)), []);
+
+  const pageData = useServerPage(initialPage, {
+    category: categoryFilter, status: statusFilter, dateFrom, dateTo,
+    col: sortCol || '', dir: sortDir || '', page: String(requestedPage),
+  }, INITIAL_QUERY, refreshTick);
 
   useEffect(() => {
-    if (!initialData && typeof window !== 'undefined') {
-      const config = window.__BENCHMARK_CONFIG__;
-      fetch(config.dataUrl)
-        .then(r => r.json())
-        .then(data => { rowData = data; });
-    }
-  }, [initialData]);
-
-  useEffect(() => {
-    if (ready && rowData.length > 0) {
-      writeState({ page: '1' });
-    }
+    if (ready) writeState({ page: '1' });
   }, [ready]);
 
-  const categories = useMemo(() => [...new Set(rowData.map(r => r.category))].sort(), [rowData.length]);
-  const statuses = useMemo(() => [...new Set(rowData.map(r => r.status))].sort(), [rowData.length]);
-
-  const filtered = useMemo(() => {
-    let rows = rowData;
-    if (categoryFilter !== 'All') rows = rows.filter(r => r.category === categoryFilter);
-    if (statusFilter !== 'All') rows = rows.filter(r => r.status === statusFilter);
-    if (dateFrom) rows = rows.filter(r => r.date >= dateFrom);
-    if (dateTo) rows = rows.filter(r => r.date <= dateTo);
-    return rows;
-  }, [categoryFilter, statusFilter, dateFrom, dateTo, rowData.length]);
-
-  const sorted = useMemo(() => {
-    if (!sortCol || !sortDir) return filtered;
-    return [...filtered].sort((a, b) => {
-      const av = a[sortCol], bv = b[sortCol];
-      let cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
-      return sortDir === 'desc' ? -cmp : cmp;
-    });
-  }, [filtered, sortCol, sortDir]);
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE));
-  const pageRows = sorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
-
-  const totalRevenue = filtered.reduce((s, r) => s + r.amount, 0);
-  const avgOrder = filtered.length > 0 ? totalRevenue / filtered.length : 0;
-  const uniqueCustomers = new Set(filtered.map(r => r.customerName)).size;
+  const { categories, statuses, rows: pageRows, page: currentPage, totalPages } = pageData;
+  const totalOrders = pageData.total;
+  const totalRevenue = pageData.totalRevenue;
+  const avgOrder = pageData.avgOrder;
+  const uniqueCustomers = pageData.uniqueCustomers;
+  const lastUpdated = pageData.loadedAt || '';
 
   const handleSort = useCallback((col) => {
     if (sortCol === col) {
@@ -132,10 +108,11 @@ export default function App({ initialData }) {
         style={{ display: 'none' }}
       />
 
+      <div className="last-updated">Last updated <time data-role="last-updated" dateTime={lastUpdated}>{formatUpdated(lastUpdated)}</time></div>
       <div className="dashboard-cards">
-        <div className="card"><div className="card-label">Total Orders</div><div className="card-value" data-role="total-orders">{filtered.length}</div></div>
-        <div className="card"><div className="card-label">Total Revenue</div><div className="card-value" data-role="total-revenue">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
-        <div className="card"><div className="card-label">Average Order</div><div className="card-value" data-role="avg-order">${avgOrder.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
+        <div className="card"><div className="card-label">Total Orders</div><div className="card-value" data-role="total-orders">{totalOrders}</div></div>
+        <div className="card"><div className="card-label">Total Revenue</div><div className="card-value" data-role="total-revenue">${money(totalRevenue)}</div></div>
+        <div className="card"><div className="card-label">Average Order</div><div className="card-value" data-role="avg-order">${money(avgOrder)}</div></div>
         <div className="card"><div className="card-label">Unique Customers</div><div className="card-value" data-role="unique-customers">{uniqueCustomers}</div></div>
       </div>
 
@@ -172,7 +149,7 @@ export default function App({ initialData }) {
               <td>{row.date}</td>
               <td>{row.customerName}</td>
               <td>{row.category}</td>
-              <td>${row.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td>${money(row.amount)}</td>
               <td><span className={`status-badge status-${row.status}`}>{row.status}</span></td>
               <td>{row.items}</td>
             </tr>

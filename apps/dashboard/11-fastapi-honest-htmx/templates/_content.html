@@ -15,6 +15,7 @@
   <input type="hidden" name="dateTo" value="{{ date_to }}">
   <input type="hidden" name="page" value="{{ page }}">
 
+  <div class="last-updated">Last updated <time data-role="last-updated" datetime="{{ loaded_at }}">{{ updated_text }}</time></div>
   <div class="dashboard-cards">
     <div class="card">
       <div class="card-label">Total Orders</div>
@@ -23,13 +24,13 @@
     <div class="card">
       <div class="card-label">Total Revenue</div>
       <div class="card-value" data-role="total-revenue">
-        <span fx-format="currency" fx-raw="{{ metrics.total_revenue }}" fx-currency="USD" fx-cloak>{{ "%.2f"|format(metrics.total_revenue) }}</span>
+        <span fx-format="currency" fx-currency="USD" fx-cloak>{{ "%.2f"|format(metrics.total_revenue) }}</span>
       </div>
     </div>
     <div class="card">
       <div class="card-label">Average Order</div>
       <div class="card-value" data-role="avg-order">
-        <span fx-format="currency" fx-raw="{{ metrics.avg_order }}" fx-currency="USD" fx-cloak>{{ "%.2f"|format(metrics.avg_order) }}</span>
+        <span fx-format="currency" fx-currency="USD" fx-cloak>{{ "%.2f"|format(metrics.avg_order) }}</span>
       </div>
     </div>
     <div class="card">
@@ -105,10 +106,10 @@
       {% for row in rows %}
       <tr data-row="{{ row.id }}">
         <td>{{ row.id }}</td>
-        <td><span fx-format="date" fx-raw="{{ row.date }}" fx-cloak>{{ row.date }}</span></td>
+        <td><span fx-format="date" fx-cloak>{{ row.date }}</span></td>
         <td>{{ row.customerName }}</td>
         <td>{{ row.category }}</td>
-        <td><span fx-format="currency" fx-raw="{{ row.amount }}" fx-currency="USD" fx-cloak>{{ "%.2f"|format(row.amount) }}</span></td>
+        <td><span fx-format="currency" fx-currency="USD" fx-cloak>{{ "%.2f"|format(row.amount) }}</span></td>
         <td><span class="status-badge status-{{ row.status }}">{{ row.status }}</span></td>
         <td>{{ row.items }}</td>
       </tr>

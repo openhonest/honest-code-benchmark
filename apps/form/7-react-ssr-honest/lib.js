@@ -90,3 +90,30 @@ export function format_review(fields) {
   }
   return lines;
 }
+
+// Server view: the shared client's first render is step 1 with empty fields;
+// it prefills from the data in an effect after hydration.
+export const STEP_COUNT = 4;
+export const STEP_LAYOUT = {
+  1: {
+    title: 'Contact Information',
+    fields: [
+      { label: 'First Name', name: 'firstName', type: 'text' },
+      { label: 'Last Name', name: 'lastName', type: 'text' },
+      { label: 'Email', name: 'email', type: 'email' },
+      { label: 'Phone', name: 'phone', type: 'tel' },
+    ],
+  },
+};
+
+export function is_required(name) {
+  return Object.values(STEP_REQUIRED_FIELDS).some(list => list.includes(name));
+}
+
+export function step_dot_class(s, step) {
+  return `step-dot${s === step ? ' active' : ''}${s < step ? ' done' : ''}`;
+}
+
+export function build_view(_records) {
+  return { step: 1, fields: { ...EMPTY_FIELDS }, errors: {} };
+}

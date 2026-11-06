@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+// Arm 9 server tree, written the conventional way: context providers, custom
+// hooks, a domain model, switch rendering and wrapper components. The browser
+// hydrates it with ../shared-client/App.jsx, so the markup must match that
+// client's first render.
+import React, { useMemo } from 'react';
+import { formatUpdated } from '../../lib/dashboard-refresh.js';
+import { ThemeProvider, ErrorBoundary, Layout, DataLoader, createStore, useFormatters, sortIndicator } from './patterns.jsx';
 
 const COLUMNS = [
   { key: 'id', label: 'Order ID' },
@@ -10,125 +16,138 @@ const COLUMNS = [
   { key: 'items', label: 'Items' },
 ];
 
-const ROWS_PER_PAGE = 25;
+const INITIAL_FILTERS = { category: 'All', status: 'All', dateFrom: '', dateTo: '', sortCol: null, sortDir: null, currentPage: 1 };
+const noop = () => {};
 
-export default function App({ initialData }) {
-  const [data, setData] = useState(initialData || []);
-  const [categoryFilter, setCategoryFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [sortColumn, setSortColumn] = useState(null);
-  const [sortDirection, setSortDirection] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
+const [DataProvider, useOrderBook] = createStore('OrderData');
+const [FilterProvider, useFilters] = createStore('OrderFilters');
 
-  useEffect(() => {
-    if (!initialData && typeof window !== 'undefined') {
-      const config = window.__BENCHMARK_CONFIG__;
-      fetch(config.dataUrl).then(r => r.json()).then(setData);
-    }
-  }, [initialData]);
+function useDashboardView() {
+  const book = useOrderBook();
+  const filters = useFilters();
+  return useMemo(() => book.view(filters), [book, filters]);
+}
 
-  const categories = useMemo(() => [...new Set(data.map(r => r.category))].sort(), [data]);
-  const statuses = useMemo(() => [...new Set(data.map(r => r.status))].sort(), [data]);
+function KpiValue({ kind, value }) {
+  const fmt = useFormatters();
+  switch (kind) {
+    case 'money':
+      return <>${fmt.money(value)}</>;
+    default:
+      return <>{value}</>;
+  }
+}
 
-  const filtered = useMemo(() => {
-    let rows = data;
-    if (categoryFilter !== 'All') rows = rows.filter(r => r.category === categoryFilter);
-    if (statusFilter !== 'All') rows = rows.filter(r => r.status === statusFilter);
-    if (dateFrom) rows = rows.filter(r => r.date >= dateFrom);
-    if (dateTo) rows = rows.filter(r => r.date <= dateTo);
-    return rows;
-  }, [data, categoryFilter, statusFilter, dateFrom, dateTo]);
+function LastUpdated({ at }) {
+  return <div className="last-updated">Last updated <time data-role="last-updated" dateTime={at}>{formatUpdated(at)}</time></div>;
+}
 
-  const sorted = useMemo(() => {
-    if (!sortColumn || !sortDirection) return filtered;
-    return [...filtered].sort((a, b) => {
-      const av = a[sortColumn], bv = b[sortColumn];
-      let cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
-      return sortDirection === 'desc' ? -cmp : cmp;
-    });
-  }, [filtered, sortColumn, sortDirection]);
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE));
-  const pageRows = sorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
-
-  const totalRevenue = filtered.reduce((s, r) => s + r.amount, 0);
-  const avgOrder = filtered.length > 0 ? totalRevenue / filtered.length : 0;
-  const uniqueCustomers = new Set(filtered.map(r => r.customerName)).size;
-
-  const handleSort = useCallback((col) => {
-    setSortColumn(prev => {
-      if (prev === col) {
-        setSortDirection(d => {
-          if (d === 'asc') return 'desc';
-          setSortColumn(null);
-          return null;
-        });
-        return prev;
-      }
-      setSortDirection('asc');
-      return col;
-    });
-  }, []);
-
-  useEffect(() => { setCurrentPage(1); }, [categoryFilter, statusFilter, dateFrom, dateTo]);
-
+function KpiCards({ kpis }) {
   return (
-    <div className="app">
-      <div className="dashboard-cards">
-        <div className="card"><div className="card-label">Total Orders</div><div className="card-value" data-role="total-orders">{filtered.length}</div></div>
-        <div className="card"><div className="card-label">Total Revenue</div><div className="card-value" data-role="total-revenue">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
-        <div className="card"><div className="card-label">Average Order</div><div className="card-value" data-role="avg-order">${avgOrder.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
-        <div className="card"><div className="card-label">Unique Customers</div><div className="card-value" data-role="unique-customers">{uniqueCustomers}</div></div>
-      </div>
-
-      <div className="filter-bar">
-        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} data-role="category-filter">
-          <option value="All">All Categories</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} data-role="status-filter">
-          <option value="All">All Statuses</option>
-          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} data-role="date-from" />
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} data-role="date-to" />
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            {COLUMNS.map(col => (
-              <th key={col.key} data-column={col.key} onClick={() => handleSort(col.key)}>
-                {col.label}
-                <span className={`sort-indicator${sortColumn === col.key ? ' active' : ''}`}>
-                  {sortColumn !== col.key ? '↕' : sortDirection === 'asc' ? '↑' : '↓'}
-                </span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {pageRows.map(row => (
-            <tr key={row.id} data-row={row.id}>
-              <td>{row.id}</td>
-              <td>{row.date}</td>
-              <td>{row.customerName}</td>
-              <td>{row.category}</td>
-              <td>${row.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-              <td><span className={`status-badge status-${row.status}`}>{row.status}</span></td>
-              <td>{row.items}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className="pagination">
-        <button onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage <= 1} data-action="prev-page">Previous</button>
-        <span className="page-info" data-role="page-info">Page {currentPage} of {totalPages}</span>
-        <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= totalPages} data-action="next-page">Next</button>
-      </div>
+    <div className="dashboard-cards">
+      <div className="card"><div className="card-label">Total Orders</div><div className="card-value" data-role="total-orders"><KpiValue kind="count" value={kpis.totalOrders} /></div></div>
+      <div className="card"><div className="card-label">Total Revenue</div><div className="card-value" data-role="total-revenue"><KpiValue kind="money" value={kpis.totalRevenue} /></div></div>
+      <div className="card"><div className="card-label">Average Order</div><div className="card-value" data-role="avg-order"><KpiValue kind="money" value={kpis.avgOrder} /></div></div>
+      <div className="card"><div className="card-label">Unique Customers</div><div className="card-value" data-role="unique-customers"><KpiValue kind="count" value={kpis.uniqueCustomers} /></div></div>
     </div>
+  );
+}
+
+function Filters() {
+  const book = useOrderBook();
+  const filters = useFilters();
+  return (
+    <div className="filter-bar">
+      <select value={filters.category} onChange={noop} data-role="category-filter">
+        <option value="All">All Categories</option>
+        {book.categories.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+      <select value={filters.status} onChange={noop} data-role="status-filter">
+        <option value="All">All Statuses</option>
+        {book.statuses.map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+      <input type="date" value={filters.dateFrom} onChange={noop} data-role="date-from" />
+      <input type="date" value={filters.dateTo} onChange={noop} data-role="date-to" />
+    </div>
+  );
+}
+
+function OrderRow({ order }) {
+  const fmt = useFormatters();
+  return (
+    <tr data-row={order.id}>
+      <td>{order.id}</td>
+      <td>{order.date}</td>
+      <td>{order.customerName}</td>
+      <td>{order.category}</td>
+      <td>${fmt.money(order.amount)}</td>
+      <td><span className={`status-badge status-${order.status}`}>{order.status}</span></td>
+      <td>{order.items}</td>
+    </tr>
+  );
+}
+
+function OrdersTable({ pageRows }) {
+  const { sortCol, sortDir } = useFilters();
+  return (
+    <table>
+      <thead>
+        <tr>
+          {COLUMNS.map(col => (
+            <th key={col.key} data-column={col.key}>
+              {col.label}
+              <span className={`sort-indicator${sortCol === col.key ? ' active' : ''}`}>
+                {sortIndicator(sortCol, sortDir, col.key)}
+              </span>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {pageRows.map(o => <OrderRow key={o.id} order={o} />)}
+      </tbody>
+    </table>
+  );
+}
+
+function Pagination({ totalPages }) {
+  const { currentPage } = useFilters();
+  return (
+    <div className="pagination">
+      <button disabled={currentPage <= 1} data-action="prev-page">Previous</button>
+      <span className="page-info" data-role="page-info">Page {currentPage} of {totalPages}</span>
+      <button disabled={currentPage >= totalPages} data-action="next-page">Next</button>
+    </div>
+  );
+}
+
+function Dashboard({ loadedAt }) {
+  const { kpis, pageRows, totalPages } = useDashboardView();
+  return (
+    <>
+      <LastUpdated at={loadedAt} />
+      <KpiCards kpis={kpis} />
+      <Filters />
+      <OrdersTable pageRows={pageRows} />
+      <Pagination totalPages={totalPages} />
+    </>
+  );
+}
+
+export default function App({ book, filters = INITIAL_FILTERS, loadedAt = '' }) {
+  return (
+    <ErrorBoundary>
+      <DataProvider value={book}>
+        <FilterProvider value={filters}>
+          <ThemeProvider>
+            <Layout>
+              <DataLoader ready={book != null}>
+                <Dashboard loadedAt={loadedAt} />
+              </DataLoader>
+            </Layout>
+          </ThemeProvider>
+        </FilterProvider>
+      </DataProvider>
+    </ErrorBoundary>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import { useDashboardStore } from './store.js';
+import { formatUpdated, subscribeRefresh, refetchRows } from '../../lib/dashboard-refresh.js';
 
 const COLUMNS = [
   { key: 'id', label: 'Order ID' },
@@ -22,6 +23,7 @@ export default function App() {
   const sortColumn = useDashboardStore(s => s.sortColumn);
   const sortDirection = useDashboardStore(s => s.sortDirection);
   const currentPage = useDashboardStore(s => s.currentPage);
+  const lastUpdated = useDashboardStore(s => s.lastUpdated);
   const setData = useDashboardStore(s => s.setData);
   const setCategoryFilter = useDashboardStore(s => s.setCategoryFilter);
   const setStatusFilter = useDashboardStore(s => s.setStatusFilter);
@@ -35,6 +37,7 @@ export default function App() {
   useEffect(() => {
     const config = window.__BENCHMARK_CONFIG__;
     fetch(config.dataUrl).then(r => r.json()).then(setData);
+    return subscribeRefresh(() => { refetchRows(config.dataUrl).then(setData); });
   }, [setData]);
 
   const categories = useMemo(() => [...new Set(data.map(r => r.category))].sort(), [data]);
@@ -52,6 +55,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="last-updated">Last updated <time data-role="last-updated" dateTime={lastUpdated}>{formatUpdated(lastUpdated)}</time></div>
       <div className="dashboard-cards">
         <div className="card"><div className="card-label">Total Orders</div><div className="card-value" data-role="total-orders">{filtered.length}</div></div>
         <div className="card"><div className="card-label">Total Revenue</div><div className="card-value" data-role="total-revenue">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>

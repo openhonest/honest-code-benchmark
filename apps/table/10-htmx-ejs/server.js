@@ -2,10 +2,12 @@ import ejs from 'ejs';
 import { Router } from 'express';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { openMutableTableDb, TABLE_EDITABLE } from '../../lib/sqlite.js';
+import { createTimer } from '../../lib/timing.js';
+import { route, intParam, strParam, selectionParam, sendTimed, requireId, BadRequest } from '../../lib/http-util.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VIEWS = join(__dirname, 'views');
-const ROWS_PER_PAGE = 25;
 
 const COLUMNS = [
   { key: 'name', label: 'Name' },
@@ -16,41 +18,28 @@ const COLUMNS = [
   { key: 'active', label: 'Active' },
 ];
 
-let tableData = [];
+let db = null;
 
-function filterRows(rows, text) {
-  if (!text) return rows;
-  const ft = text.toLowerCase();
-  return rows.filter(r =>
-    r.name.toLowerCase().includes(ft) ||
-    r.email.toLowerCase().includes(ft) ||
-    r.department.toLowerCase().includes(ft)
-  );
-}
-
-function sortRows(rows, col, dir) {
-  if (!col || !dir) return rows;
-  return [...rows].sort((a, b) => {
-    const av = a[col], bv = b[col];
-    let cmp = 0;
-    if (typeof av === 'string') cmp = av.localeCompare(bv);
-    else if (typeof av === 'boolean') cmp = av === bv ? 0 : av ? -1 : 1;
-    else cmp = av - bv;
-    return dir === 'desc' ? -cmp : cmp;
-  });
-}
-
-function computeView(sortCol, sortDir, filter, page, selectedIds) {
-  let rows = filterRows(tableData, filter);
-  rows = sortRows(rows, sortCol, sortDir);
-  const totalRows = rows.length;
-  const totalPages = Math.max(1, Math.ceil(totalRows / ROWS_PER_PAGE));
-  const p = Math.min(Math.max(1, page), totalPages);
-  const pageRows = rows.slice((p - 1) * ROWS_PER_PAGE, p * ROWS_PER_PAGE);
-  const visibleIds = pageRows.map(r => r.id);
+async function renderContent(state, basePath, timer = createTimer()) {
+  const { sortCol, sortDir, filter, page, selectedIds } = state;
+  const result = timer.time('load', () => db.page({ q: filter, col: sortCol, dir: sortDir, page }));
+  const visibleIds = result.rows.map(r => r.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds[id]);
   const selCount = Object.keys(selectedIds).length;
-  return { pageRows, totalRows, totalPages, page: p, allVisibleSelected, selCount };
+  return timer.timeAsync('render', () => ejs.renderFile(join(VIEWS, '_content.ejs'), {
+    rows: result.rows,
+    totalRows: result.total,
+    totalPages: result.totalPages,
+    page: result.page,
+    sortCol, sortDir, filter, selectedIds,
+    allVisibleSelected, selCount,
+    columns: COLUMNS, basePath,
+  }, { cache: true }));
+}
+
+async function sendContent(res, state, basePath) {
+  const timer = createTimer();
+  sendTimed(res, timer, await renderContent(state, basePath, timer));
 }
 
 function parseState(query, body) {
@@ -59,37 +48,37 @@ function parseState(query, body) {
     sortCol: src.sortCol || '',
     sortDir: src.sortDir || '',
     filter: src.filter || '',
-    page: parseInt(src.page, 10) || 1,
-    selectedIds: (() => { try { return JSON.parse(src.selected || '{}'); } catch { return {}; } })(),
+    page: intParam(src.page, 'page'),
+    selectedIds: selectionParam(src.selected),
   };
 }
 
-async function renderContent(state, basePath) {
-  const { sortCol, sortDir, filter, page, selectedIds } = state;
-  const view = computeView(sortCol, sortDir, filter, page, selectedIds);
-  return ejs.renderFile(join(VIEWS, '_content.ejs'), {
-    ...view, rows: view.pageRows,
-    sortCol, sortDir, filter, selectedIds, columns: COLUMNS, basePath,
-  });
-}
-
-export async function render(data, opts) {
-  tableData = [...data];
+// Opening the working copy is setup and is not timed. Each page load gets a
+// fresh copy of the pristine database, and the previous copy is removed.
+export async function render(sqlitePath, opts, timer = createTimer()) {
+  db?.dispose();
+  db = openMutableTableDb(sqlitePath);
+  const result = timer.time('load', () => db.page({ q: '', col: '', dir: '', page: 1 }));
   const basePath = `/${opts.archetype}/10-htmx-ejs`;
-  const view = computeView('', '', '', 1, {});
-  return ejs.renderFile(join(VIEWS, 'page.ejs'), {
-    ...view,
+  return timer.timeAsync('render', () => ejs.renderFile(join(VIEWS, 'page.ejs'), {
+    pageRows: result.rows,
+    totalRows: result.total,
+    totalPages: result.totalPages,
+    page: result.page,
     sortCol: '', sortDir: '', filter: '', selectedIds: {},
+    allVisibleSelected: false, selCount: 0,
     columns: COLUMNS, basePath,
     archetype: opts.archetype, arm: opts.arm, dataRows: opts.rows,
-  });
+  }, { cache: true }));
 }
 
 export function partialRouter(dataDir, archetype) {
   const router = Router();
+  // Partials act on the working copy that the last page load opened.
+  router.use((req, res, next) => (db || req.path === '/' ? next() : next(new BadRequest('load the page before sending partial requests'))));
   const basePath = `/${archetype}/10-htmx-ejs`;
 
-  router.get('/sort', async (req, res) => {
+  router.get('/sort', route(async (req, res) => {
     const state = parseState(req.query);
     const col = req.query.col;
     if (state.sortCol === col) {
@@ -99,69 +88,67 @@ export function partialRouter(dataDir, archetype) {
       state.sortCol = col;
       state.sortDir = 'asc';
     }
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
-  router.get('/filter', async (req, res) => {
+  router.get('/filter', route(async (req, res) => {
     const state = parseState(req.query);
     state.filter = req.query.filterInput || '';
     state.page = 1;
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
-  router.get('/page', async (req, res) => {
+  router.get('/page', route(async (req, res) => {
     const state = parseState(req.query);
-    state.page = parseInt(req.query.p, 10) || 1;
-    res.send(await renderContent(state, basePath));
-  });
+    state.page = intParam(req.query.p, 'p');
+    await sendContent(res, state, basePath);
+  }));
 
-  router.post('/toggle', async (req, res) => {
+  router.post('/toggle', route(async (req, res) => {
     const state = parseState(req.query, req.body);
-    const id = req.query.id;
+    const id = requireId(req.query.id);
     if (state.selectedIds[id]) delete state.selectedIds[id];
     else state.selectedIds[id] = true;
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
-  router.post('/toggle-all', async (req, res) => {
+  router.post('/toggle-all', route(async (req, res) => {
     const state = parseState(req.query, req.body);
-    const view = computeView(state.sortCol, state.sortDir, state.filter, state.page, state.selectedIds);
-    const ids = view.pageRows.map(r => r.id);
+    const result = db.page({ q: state.filter, col: state.sortCol, dir: state.sortDir, page: state.page });
+    const ids = result.rows.map(r => r.id);
     const all = ids.every(id => state.selectedIds[id]);
     if (all) ids.forEach(id => delete state.selectedIds[id]);
     else ids.forEach(id => { state.selectedIds[id] = true; });
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
-  router.post('/delete', async (req, res) => {
+  router.post('/delete', route(async (req, res) => {
     const state = parseState(req.query, req.body);
-    tableData = tableData.filter(r => !state.selectedIds[r.id]);
+    const ids = Object.keys(state.selectedIds).map(Number);
+    if (ids.length > 0) db.delete(ids);
     state.selectedIds = {};
-    const totalPages = Math.max(1, Math.ceil(tableData.length / ROWS_PER_PAGE));
-    if (state.page > totalPages) state.page = totalPages;
-    res.send(await renderContent(state, basePath));
-  });
+    await sendContent(res, state, basePath);
+  }));
 
-  router.get('/edit-cell', async (req, res) => {
-    const id = req.query.id;
+  router.get('/edit-cell', route(async (req, res) => {
+    const id = requireId(req.query.id);
     const col = req.query.col;
-    const row = tableData.find(r => r.id === id);
+    if (!TABLE_EDITABLE.has(col)) throw new BadRequest('column is not editable');
+    const timer = createTimer();
+    const row = timer.time('load', () => db.getById(id));
     if (!row) { res.status(404).send(''); return; }
-    const html = await ejs.renderFile(join(VIEWS, '_edit-cell.ejs'), { id, col, value: row[col], basePath });
-    res.send(html);
-  });
+    const html = await timer.timeAsync('render', () => ejs.renderFile(join(VIEWS, '_edit-cell.ejs'), { id, col, value: row[col], basePath }, { cache: true }));
+    sendTimed(res, timer, html);
+  }));
 
-  router.post('/commit-edit', async (req, res) => {
+  router.post('/commit-edit', route(async (req, res) => {
     const state = parseState(req.query, req.body);
-    const id = req.query.id;
+    const id = requireId(req.query.id);
     const col = req.query.col;
     const value = req.body?.editValue ?? req.query.editValue ?? '';
-    const row = tableData.find(r => r.id === id);
-    if (row) {
-      row[col] = col === 'salary' ? (parseInt(value, 10) || row[col]) : value;
-    }
-    res.send(await renderContent(state, basePath));
-  });
+    if (!db.update(id, col, value)) throw new BadRequest('invalid edit');
+    await sendContent(res, state, basePath);
+  }));
 
   return router;
 }

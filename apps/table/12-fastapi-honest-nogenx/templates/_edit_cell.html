@@ -1,0 +1,11 @@
+<td class="editing" data-column="{{ col }}">
+  <input type="text"
+         name="editValue"
+         value="{{ value }}"
+         autofocus
+         hx-post="{{ base_path }}/commit-edit?id={{ id }}&col={{ col }}"
+         hx-trigger="keyup[key=='Enter']"
+         hx-target="#table-content"
+         hx-swap="outerHTML"
+         hx-include="#table-content input[type=hidden]">
+</td>

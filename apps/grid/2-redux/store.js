@@ -1,4 +1,5 @@
 import { configureStore, createSlice } from '@reduxjs/toolkit';
+import { parseMoney } from '../../lib/value-rules.js';
 
 const ROWS_PER_PAGE = 25;
 
@@ -38,8 +39,8 @@ const gridSlice = createSlice({
     commitEdit(state) {
       if (!state.editingCell) return;
       const { id, field } = state.editingCell;
-      const num = parseFloat(state.editingValue);
-      if (!isNaN(num)) {
+      const num = parseMoney(state.editingValue);
+      if (num !== null) {
         const row = state.data.find(r => r.id === id);
         if (row) row[field] = num;
       }
@@ -50,8 +51,8 @@ const gridSlice = createSlice({
     setBulkQuarter(state, action) { state.bulkQuarter = action.payload; },
     setBulkValue(state, action) { state.bulkValue = action.payload; },
     bulkFill(state) {
-      const num = parseFloat(state.bulkValue);
-      if (isNaN(num)) return;
+      const num = parseMoney(state.bulkValue);
+      if (num === null) return;
       const q = state.bulkQuarter;
       for (const row of state.data) {
         if (state.selectedIds[row.id]) row[q] = num;

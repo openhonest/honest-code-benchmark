@@ -1,56 +1,52 @@
 // Interaction script: data table (Archetype 2).
 //
-// Operation vocabulary follows js-framework-benchmark (Krausest) where
-// applicable: select, update (inline edit), remove (delete selected).
-// Additional operations from the preregistration: sort, filter, paginate.
+// Selector contract (task-specification.md, "Selector contract"):
+//   th[data-column=<key>], td[data-column=<key>], tr[data-row=<id>],
+//   [data-role=filter-input|select-all|row-checkbox|page-info],
+//   [data-action=prev-page|next-page|delete-selected].
 //
-// Preregistration sequence:
-//   Sort by two columns, filter by a substring, paginate to page 3,
-//   inline-edit one cell, select 5 rows, delete selected.
+// Sequence: sort by name twice, sort by salary, filter "Smith", page
+// forward twice, clear the filter, double-click a name cell and edit it,
+// select five rows, delete the selection.
+
+import { settle, prepare, clickIfEnabled } from './settle.js';
 
 export default async function tableInteraction(page) {
-  // Sort by name ascending
-  await page.click('th[data-column="name"]');
-  await page.waitForTimeout(300);
+  prepare(page);
 
-  // Sort by name descending (second click)
-  await page.click('th[data-column="name"]');
-  await page.waitForTimeout(300);
+  await page.click('th[data-column="name"]'); // name ascending
+  await settle(page);
+  await page.click('th[data-column="name"]'); // name descending
+  await settle(page);
+  await page.click('th[data-column="salary"]'); // salary ascending
+  await settle(page);
 
-  // Sort by salary ascending (clears name sort, sorts salary)
-  await page.click('th[data-column="salary"]');
-  await page.waitForTimeout(300);
-
-  // Filter by substring
   await page.fill('[data-role="filter-input"]', 'Smith');
-  await page.waitForTimeout(400);
+  await settle(page, 400); // the filter is debounced in some arms
 
-  // Paginate to page 3
-  await page.click('[data-action="next-page"]');
-  await page.waitForTimeout(300);
-  await page.click('[data-action="next-page"]');
-  await page.waitForTimeout(300);
+  await clickIfEnabled(page, '[data-action="next-page"]');
+  await settle(page);
+  await clickIfEnabled(page, '[data-action="next-page"]');
+  await settle(page);
 
-  // Clear filter to get full dataset back
+  // Clear the filter so the edit and delete act on the full dataset.
   await page.fill('[data-role="filter-input"]', '');
-  await page.waitForTimeout(400);
+  await settle(page, 400);
 
-  // Inline edit: double-click a name cell, change value, press Enter
-  await page.dblclick('td[data-column="name"]:first-of-type');
-  await page.waitForTimeout(200);
-  await page.keyboard.selectAll();
-  await page.keyboard.type('Edited Name');
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(300);
+  await page.dblclick('tbody tr:first-child td[data-column="name"]');
+  const editor = page.locator('td[data-column="name"] input').first();
+  await editor.waitFor();
+  await editor.fill('Edited Name');
+  await editor.press('Enter');
+  await settle(page);
 
-  // Select 5 rows via checkboxes
-  const checkboxes = page.locator('td[data-column="select"] input[type="checkbox"]');
-  for (let i = 0; i < 5; i++) {
-    await checkboxes.nth(i).check();
-    await page.waitForTimeout(100);
+  const boxes = page.locator('[data-role="row-checkbox"]');
+  const n = Math.min(5, await boxes.count());
+  for (let i = 0; i < n; i++) {
+    await boxes.nth(i).click();
+    await settle(page);
   }
 
-  // Delete selected
-  await page.click('[data-action="delete-selected"]');
-  await page.waitForTimeout(500);
+  await clickIfEnabled(page, '[data-action="delete-selected"]');
+  await settle(page);
 }

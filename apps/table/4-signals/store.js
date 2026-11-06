@@ -1,4 +1,5 @@
 import { signal, computed } from '@preact/signals-react';
+import { parseSalary } from '../../lib/value-rules.js';
 
 const ROWS_PER_PAGE = 25;
 
@@ -24,13 +25,19 @@ export const filteredSorted = computed(() => {
   const col = sortColumn.value;
   const dir = sortDirection.value;
   if (col && dir) {
+    const sign = dir === 'desc' ? -1 : 1;
     rows = [...rows].sort((a, b) => {
       const av = a[col], bv = b[col];
       let cmp = 0;
-      if (typeof av === 'string') cmp = av.localeCompare(bv);
-      else if (typeof av === 'boolean') cmp = av === bv ? 0 : av ? -1 : 1;
-      else cmp = av - bv;
-      return dir === 'desc' ? -cmp : cmp;
+      if (typeof av === 'string') {
+        const al = av.toLowerCase(), bl = bv.toLowerCase();
+        cmp = al < bl ? -1 : al > bl ? 1 : 0;
+      } else if (typeof av === 'boolean') {
+        cmp = av === bv ? 0 : av ? -1 : 1;
+      } else {
+        cmp = av - bv;
+      }
+      return cmp !== 0 ? sign * cmp : (a.id < b.id ? -1 : 1);
     });
   }
   return rows;
@@ -83,7 +90,7 @@ export function commitEdit() {
   const row = data.value.find(r => r.id === cell.id);
   if (row) {
     row[cell.column] = cell.column === 'salary'
-      ? parseInt(editingValue.value, 10) || row[cell.column]
+      ? (parseSalary(editingValue.value) ?? row[cell.column])
       : editingValue.value;
     data.value = [...data.value];
   }
