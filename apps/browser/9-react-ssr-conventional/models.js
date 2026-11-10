@@ -35,7 +35,8 @@ export class RecordBrowser {
   }
 
   view(filters) {
-    const filtered = this.records.filter(r => r.matches(filters));
+    const needsFilter = filters.search || filters.status !== 'all';
+    const filtered = needsFilter ? this.records.filter(r => r.matches(filters)) : this.records;
     const sorted = sortBy(filtered, COLUMN_TYPES, filters.sortCol, filters.sortDir);
     const start = (filters.currentPage - 1) * ROWS_PER_PAGE;
     return {

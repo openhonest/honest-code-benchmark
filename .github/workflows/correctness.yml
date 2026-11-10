@@ -43,7 +43,7 @@ jobs:
       - name: Unit tests (value rules, Node and Python)
         working-directory: apps
         run: |
-          node --test tests/
+          node --test tests/*.test.*
           .venv/bin/python -m unittest discover -s tests
 
       - name: SSR parity (Arms 7-9 markup and bundles)

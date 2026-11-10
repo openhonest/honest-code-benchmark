@@ -14,17 +14,21 @@ const QUARTER_FIELDS = ['q1', 'q2', 'q3', 'q4'];
 class BudgetItem {
   constructor(row) {
     this.id = row.id;
-    this.name = row.name;
+    this.description = row.description;
     this.category = row.category;
     this.q1 = row.q1;
     this.q2 = row.q2;
     this.q3 = row.q3;
     this.q4 = row.q4;
-    this.total = row.total;
+    this.budgetTarget = row.budgetTarget;
   }
 
-  get formattedTotal() {
-    return this.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  get total() {
+    return this.q1 + this.q2 + this.q3 + this.q4;
+  }
+
+  get variance() {
+    return this.total - this.budgetTarget;
   }
 
   quarterValue(quarter) {

@@ -1,6 +1,6 @@
 # Task specification: matched implementation benchmark
 
-Version 0.2 · Oct 29, 2026
+Version 0.3 · Nov 10, 2026
 
 This document defines the functional requirements for each benchmark application archetype. All arms build to this specification. No implementation may add features beyond what is listed here. This document is frozen at preregistration.
 
@@ -68,11 +68,19 @@ Arms 7, 8, and 9 use React `renderToString` on the server for the initial page, 
 
 Arm 6 uses React `renderToString` on the server for the initial page. After hydration, client-side interactions use stateless-domx hooks (DOM as state) instead of React useState.
 
-Arms 10 and 11 do not hydrate. All interactions are handled by the server: htmx sends a request, the server renders an HTML fragment, and htmx swaps it into the page.
+Arms 10 through 13 do not hydrate. All interactions are handled by the server: htmx sends a request, the server renders an HTML fragment, and htmx swaps it into the page.
+
+#### Arm 12: FastAPI + Honest Code + htmx (no genX)
+
+Arm 12 is identical to Arm 11 on the server: the same FastAPI application, the same Honest Code patterns, the same Jinja2 templates. It differs on the client: Arm 12 does not load genX or domx. Values that Arm 11 formats client-side with genX attributes (e.g., `fx-format="currency"`) are pre-formatted in Jinja2 on the server. This isolates genX's client-side overhead.
+
+#### Arm 13: Node + htmx + EJS + conventional class/object
+
+Arm 13 uses the same EJS templates and htmx interaction patterns as Arm 10 (templates are byte-identical). The server code uses conventional class/object architecture: domain model classes (e.g., `Employee`, `Order`, `BudgetItem`), service layers (e.g., `TableService`, `DashboardService`), and controller classes (e.g., `TableController`). Object instantiation happens per request. This is the htmx counterpart to Arm 9's conventional React patterns, providing a second data point for the code-style variable outside the React SSR ablation.
 
 Every htmx request carries the whole page state in hidden inputs. A small shared script, `apps/lib/htmx-replay.js`, saves the last successful request in local storage and replays it once after a reload, so the sort, filters, page, selection, and form step survive a refresh; deletes, edits, and submits are never replayed.
 
-For initial page load, all server-rendered arms render the full page. Fragment granularity for Arms 10 and 11 is defined per archetype below.
+For initial page load, all server-rendered arms render the full page. Fragment granularity for Arms 10 through 13 is defined per archetype below.
 
 ## Archetype 1: multi-step form
 
@@ -264,7 +272,7 @@ Arm 9 is identical to Arm 7 except the server components follow all five convent
 
 ## Selector contract
 
-Every arm exposes the same selectors, so one harness script per archetype drives all eleven arms. The harness scripts in `harness/src/interactions/` use only these selectors. `npm run check` in `harness/` runs every script against every arm without timing and must report all 55 arm-archetype pairs complete before registration.
+Every arm exposes the same selectors, so one harness script per archetype drives all thirteen arms. The harness scripts in `harness/src/interactions/` use only these selectors. `npm run check` in `harness/` runs every script against every arm without timing and must report all 65 arm-archetype pairs complete before registration.
 
 | Archetype | Selectors |
 |---|---|

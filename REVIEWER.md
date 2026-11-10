@@ -1,8 +1,20 @@
 # Reviewer Guide
 
-You are reviewing the two conventional control arms of a 13-arm benchmark. The question is whether these arms faithfully represent how a competent developer would build each application using conventional patterns. Are they sandbagged, gold-plated, or missing an obvious optimization?
+You are reviewing the control arms of a 13-arm benchmark. The question is whether these arms faithfully represent how a competent developer would build each application using conventional patterns. Are they sandbagged, gold-plated, or missing an obvious optimization?
 
 ## What to review
+
+### Arm 1: React CSR + useState (baseline)
+
+The shared client code that all five CSR arms and the three React SSR arms (7, 8, 9) hydrate. One directory per archetype:
+
+- `apps/table/shared-client/`
+- `apps/dashboard/shared-client/`
+- `apps/browser/shared-client/`
+- `apps/form/shared-client/`
+- `apps/grid/shared-client/`
+
+Each contains `App.jsx` (component tree and state management). The Arm 1 entry points (`apps/*/1-useState/index.jsx`) render this shared client directly.
 
 ### Arm 9: conventional React SSR
 
@@ -14,7 +26,7 @@ Context providers, custom hooks, domain model classes, component hierarchy. One 
 - `apps/form/9-react-ssr-conventional/`
 - `apps/grid/9-react-ssr-conventional/`
 
-Each contains `App.jsx` (component tree), `server.jsx` (SSR entry), `models.js` (domain classes), `patterns.jsx` (React patterns: context, hooks), and `index.jsx` (client hydration).
+Each contains `App.jsx` (component tree), `server.jsx` (SSR entry), `models.js` (domain classes), `patterns.jsx` (React patterns: context, hooks), and `index.jsx` (client hydration). The server tree runs inside `renderToString`; after hydration, the client runs the shared Arm 1 code.
 
 ### Arm 13: conventional Node + htmx + EJS
 
@@ -39,12 +51,12 @@ These files define what each archetype does and how measurements work. Read them
 
 ### What is out of scope
 
-Everything else: Arms 1-8, Arms 10-12, the harness (`harness/`), the build system, data generation, vendor libraries, and the treatment arms that use DATAOS, genX, or Honest Code patterns. You are reviewing only whether the conventional controls are fair.
+Everything else: Arms 2-8, Arms 10-12, the harness (`harness/`), the build system, data generation, vendor libraries, and the treatment arms that use DATAOS, genX, or Honest Code patterns. You are reviewing only whether the baseline and conventional controls are fair.
 
 ## How to review
 
 1. Read `task-specification.md` to understand what each archetype must do.
-2. For each archetype in Arms 9 and 13, check:
+2. For each archetype in Arms 1, 9, and 13, check:
    - Does the code implement the specified behavior?
    - Are the patterns idiomatic for a competent developer using these tools?
    - Is anything conspicuously slow that a reasonable developer would optimize?
@@ -55,11 +67,13 @@ Everything else: Arms 1-8, Arms 10-12, the harness (`harness/`), the build syste
 
 ```bash
 npm install              # from apps/
+node build.js            # build client bundles (needed for Arms 1 and 9)
 node server.js           # starts on http://localhost:4000
 
 # Example URLs:
+# http://localhost:4000/table/1-useState/?rows=1000
 # http://localhost:4000/table/9-react-ssr-conventional/?rows=1000
 # http://localhost:4000/table/13-htmx-ejs-conventional/?rows=1000
 ```
 
-Arm 9 requires a build step first: `node build.js` from `apps/`. Arm 13 runs directly (server-rendered EJS, no build).
+Arm 13 runs directly (server-rendered EJS, no build step needed).

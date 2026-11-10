@@ -39,7 +39,8 @@ export class OrderBook {
   }
 
   view(filters) {
-    const filtered = this.orders.filter(o => o.matches(filters));
+    const needsFilter = filters.category !== 'All' || filters.status !== 'All' || filters.dateFrom || filters.dateTo;
+    const filtered = needsFilter ? this.orders.filter(o => o.matches(filters)) : this.orders;
     const sorted = sortBy(filtered, COLUMN_TYPES, filters.sortCol, filters.sortDir);
     const totalRevenue = filtered.reduce((s, o) => s + o.amount, 0);
     const start = (filters.currentPage - 1) * ROWS_PER_PAGE;

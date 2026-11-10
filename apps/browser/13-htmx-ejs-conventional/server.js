@@ -25,9 +25,6 @@ class Record {
     this.status = row.status;
     this.createdDate = row.createdDate;
     this.value = row.value;
-    this.description = row.description;
-    this.category = row.category;
-    this.tags = row.tags;
   }
 
   get isActive() {

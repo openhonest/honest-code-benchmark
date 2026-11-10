@@ -33,9 +33,6 @@ class Employee {
     return Boolean(this.active);
   }
 
-  get formattedSalary() {
-    return `$${this.salary.toLocaleString()}`;
-  }
 }
 
 class TableService {
