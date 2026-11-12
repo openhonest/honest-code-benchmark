@@ -20,7 +20,8 @@ const stateManifest = {
   page:      { selector: '#table-state', read: 'data:page',      write: 'data:page' },
   selected:  { selector: '#table-state', read: 'data:selected',  write: 'data:selected' },
   editing:   { selector: '#table-state', read: 'data:editing',   write: 'data:editing' },
-  editValue: { selector: '#table-state', read: 'data:editValue', write: 'data:editValue' },
+  editValue:    { selector: '#table-state', read: 'data:editValue',    write: 'data:editValue' },
+  dataVersion:  { selector: '#table-state', read: 'data:dataVersion',  write: 'data:dataVersion' },
 };
 
 let rowData = [];
@@ -62,7 +63,7 @@ function EditableCell({ row, column, editingCell, editingValue }) {
             : editingValue;
         }
       }
-      writeState({ editing: '', editValue: '' });
+      writeState({ editing: '', editValue: '', dataVersion: String(Date.now()) });
     } else if (e.key === 'Escape') {
       writeState({ editing: '', editValue: '' });
     }
@@ -142,7 +143,7 @@ export default function App() {
       });
     }
     return rows;
-  }, [filterText, sortCol, sortDir, rowData.length]);
+  }, [filterText, sortCol, sortDir, rowData.length, domState.dataVersion]);
 
   const totalPages = Math.max(1, Math.ceil(filteredSorted.length / ROWS_PER_PAGE));
   const pageRows = filteredSorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
@@ -199,7 +200,7 @@ export default function App() {
     <div className="app">
       <div id="table-state"
         data-sort-col="" data-sort-dir="" data-filter=""
-        data-page="1" data-selected="{}" data-editing="" data-edit-value=""
+        data-page="1" data-selected="{}" data-editing="" data-edit-value="" data-data-version="0"
         style={{ display: 'none' }}
       />
 
