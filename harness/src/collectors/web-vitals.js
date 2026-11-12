@@ -17,11 +17,16 @@ export const initScript = `
     mutationTimestamps: [],
   };
 
-  new MutationObserver(() => {
-    window.__harness.mutationTimestamps.push(performance.now());
-  }).observe(document.documentElement, {
-    childList: true, subtree: true, attributes: true, characterData: true,
-  });
+  // Defer MutationObserver to DOMContentLoaded: at addInitScript time,
+  // document.documentElement is not yet a valid Node (the HTML parser
+  // replaces it), so .observe() throws and kills the rest of the script.
+  document.addEventListener('DOMContentLoaded', () => {
+    new MutationObserver(() => {
+      window.__harness.mutationTimestamps.push(performance.now());
+    }).observe(document.documentElement, {
+      childList: true, subtree: true, attributes: true, characterData: true,
+    });
+  }, { once: true });
 
   new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
