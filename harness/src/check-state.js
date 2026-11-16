@@ -86,11 +86,11 @@ async function tableSteps(page) {
   snaps['sort-salary-asc'] = await captureRowIds(page);
 
   await page.fill('[data-role="filter-input"]', 'Smith');
-  await settle(page, 400);
+  await settle(page, 1000);
   snaps['filter-smith'] = await captureRowIds(page);
 
   await page.fill('[data-role="filter-input"]', '');
-  await settle(page, 400);
+  await settle(page, 1000);
 
   // Sort by name for the edit re-sort check.
   await page.click('th[data-column="salary"]'); // clear salary sort
@@ -105,8 +105,16 @@ async function tableSteps(page) {
   const editor = page.locator('td[data-column="name"] input').first();
   await editor.waitFor({ timeout: 5000 });
   await editor.fill('ZZZZZ');
+  // Arm 5's controlled input reads its value prop from DOM state.
+  // fill() sets the DOM attribute, but the MutationObserver → React
+  // cycle that updates the input's controlled value is asynchronous.
+  // Without this wait, React resets the input to the old value before
+  // the keydown fires.
+  await page.waitForTimeout(500);
   await editor.press('Enter');
   await settle(page);
+  // SSR arms need extra time for the server round trip.
+  await page.waitForTimeout(2000);
   snaps['after-edit-name-sorted'] = await captureRowIds(page);
 
   return snaps;
