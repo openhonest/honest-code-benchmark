@@ -166,6 +166,8 @@ async function runOnce(browser, url, networkProfile, deviceProfile, collector, i
   // Settle after initial load
   await page.waitForTimeout(2000);
 
+  await page.evaluate(() => { window.__harness.reactRenderCount = 0; });
+
   // Run the interaction script
   await interact(page);
 
@@ -262,7 +264,7 @@ const CSV_COLUMNS = [
 ];
 
 function hashRow(values) {
-  const payload = values.filter(v => v !== '').join('|');
+  const payload = values.join('|');
   return createHash('sha256').update(payload).digest('hex');
 }
 
