@@ -255,6 +255,7 @@ const CSV_COLUMNS = [
   'longTaskCount', 'layoutShiftCount', 'layoutCount', 'recalcStyleCount',
   'interactionCount', 'eventEntryCount', 'mutationCount',
   'bundleTransferSize', 'bundleParsedSize', 'wallClockMs',
+  'reactRenderCount', 'htmlFragmentTotalBytes', 'htmlFragmentCount',
   'perInteractionSettled',
   'sha256',
 ];
@@ -289,6 +290,7 @@ function csvRows(condition, runs) {
         r.bundleSize?.totalTransferSize ?? '',
         r.bundleSize?.scripts?.reduce((s, x) => s + (x.decodedBodySize || 0), 0) || '',
         r.wallClockMs ?? '',
+        r.reactRenderCount ?? '', r.htmlFragmentTotalBytes ?? '', r.htmlFragmentCount ?? '',
         settled,
       ];
       const hash = hashRow(values);

@@ -15,7 +15,28 @@ export const initScript = `
     lcpEntries: [],
     layoutShifts: [],
     mutationTimestamps: [],
+    reactRenderCount: 0,
+    xhrResponses: [],
   };
+
+  // React re-render counting via DevTools hook.
+  // Injected before React loads; React calls onCommitFiberRoot on every commit.
+  // htmx arms have no React, so the counter stays 0.
+  (function() {
+    if (!window.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
+      var id = 0;
+      window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+        supportsFiber: true,
+        inject: function() { return ++id; },
+        onCommitFiberRoot: function() {
+          window.__harness.reactRenderCount++;
+        },
+        onCommitFiberUnmount: function() {},
+        isDisabled: false,
+        renderers: new Map(),
+      };
+    }
+  })();
 
   // Defer MutationObserver to DOMContentLoaded: at addInitScript time,
   // document.documentElement is not yet a valid Node (the HTML parser
@@ -70,6 +91,19 @@ export const initScript = `
       }
     }
   }).observe({ type: 'layout-shift', buffered: true });
+
+  new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      if (entry.initiatorType === 'xmlhttprequest' || entry.initiatorType === 'fetch') {
+        window.__harness.xhrResponses.push({
+          name: entry.name,
+          transferSize: entry.transferSize,
+          decodedBodySize: entry.decodedBodySize,
+          startTime: entry.startTime,
+        });
+      }
+    }
+  }).observe({ type: 'resource', buffered: true });
 `;
 
 export async function beforeRun(page, cdpSession) {
@@ -222,6 +256,12 @@ export async function afterRun(page, cdpSession) {
       totalTransferSize: scripts.reduce((sum, s) => sum + s.transferSize, 0),
     };
 
+    // HTML fragment sizes: XHR/fetch responses after the initial 2s load settle
+    // are interaction-triggered (SSR/htmx round trips).
+    const interactionXhr = window.__harness.xhrResponses.filter(r => r.startTime > 2000);
+    const htmlFragmentTotalBytes = interactionXhr.reduce((s, r) => s + (r.decodedBodySize || 0), 0);
+    const htmlFragmentCount = interactionXhr.length;
+
     return {
       ttfb, fcp: fcpTime, lcp: lcpTime, tti, tbt, inp, cls,
       interactionToSettled, perInteractionSettled,
@@ -233,6 +273,9 @@ export async function afterRun(page, cdpSession) {
       interactionCount: eventEntries.length > 0
         ? new Set(eventEntries.filter(e => e.interactionId > 0).map(e => e.interactionId)).size
         : 0,
+      reactRenderCount: window.__harness.reactRenderCount,
+      htmlFragmentTotalBytes,
+      htmlFragmentCount,
     };
   });
 
