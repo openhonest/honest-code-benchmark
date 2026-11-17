@@ -177,6 +177,22 @@ export async function afterRun(page, cdpSession) {
       }
     }
 
+    // Per-interaction INP (max event-timing duration per interaction, chronological).
+    const perInteractionInp = [];
+    if (eventEntries.length > 0) {
+      const byId = new Map();
+      const firstTime = new Map();
+      for (const e of eventEntries) {
+        if (e.interactionId === 0) continue;
+        byId.set(e.interactionId, Math.max(byId.get(e.interactionId) || 0, e.duration));
+        if (!firstTime.has(e.interactionId)) firstTime.set(e.interactionId, e.startTime);
+      }
+      const ordered = [...byId.entries()]
+        .map(([id, dur]) => ({ t: firstTime.get(id), dur }))
+        .sort((a, b) => a.t - b.t);
+      for (const { dur } of ordered) perInteractionInp.push(dur);
+    }
+
     // Interaction-to-settled: time from each user input to the last DOM mutation
     // before the next input. Uses mutation timestamps paired with event entries.
     const mutations = window.__harness.mutationTimestamps;
@@ -276,6 +292,7 @@ export async function afterRun(page, cdpSession) {
       reactRenderCount: window.__harness.reactRenderCount,
       htmlFragmentTotalBytes,
       htmlFragmentCount,
+      perInteractionInp,
     };
   });
 

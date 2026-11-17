@@ -256,7 +256,7 @@ const CSV_COLUMNS = [
   'interactionCount', 'eventEntryCount', 'mutationCount',
   'bundleTransferSize', 'bundleParsedSize', 'wallClockMs',
   'reactRenderCount', 'htmlFragmentTotalBytes', 'htmlFragmentCount',
-  'perInteractionSettled',
+  'perInteractionInp', 'perInteractionSettled',
   'sha256',
 ];
 
@@ -269,9 +269,8 @@ function csvRows(condition, runs) {
   let csv = '';
   {
     runs.forEach((r, i) => {
-      const settled = Array.isArray(r.perInteractionSettled) && r.perInteractionSettled.length > 0
-        ? r.perInteractionSettled.map(v => v.toFixed(2)).join(';')
-        : '';
+      const fmtArray = (arr) => Array.isArray(arr) && arr.length > 0
+        ? arr.map(v => v.toFixed(2)).join(';') : '';
       const values = [
         condition, i + 1, r.wallClockStart ?? '',
         r.ttfb ?? '', r.fcp ?? '', r.lcp ?? '', r.tti ?? '',
@@ -291,7 +290,8 @@ function csvRows(condition, runs) {
         r.bundleSize?.scripts?.reduce((s, x) => s + (x.decodedBodySize || 0), 0) || '',
         r.wallClockMs ?? '',
         r.reactRenderCount ?? '', r.htmlFragmentTotalBytes ?? '', r.htmlFragmentCount ?? '',
-        settled,
+        fmtArray(r.perInteractionInp),
+        fmtArray(r.perInteractionSettled),
       ];
       const hash = hashRow(values);
       csv += [...values, hash].join(',') + '\n';
