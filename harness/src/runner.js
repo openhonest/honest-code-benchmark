@@ -271,7 +271,7 @@ function csvRows(condition, runs) {
   {
     runs.forEach((r, i) => {
       const fmtArray = (arr) => Array.isArray(arr) && arr.length > 0
-        ? arr.map(v => v.toFixed(2)).join(';') : '';
+        ? arr.map(v => v === null ? '' : v.toFixed(2)).join(';') : '';
       const values = [
         condition, i + 1, r.wallClockStart ?? '',
         r.ttfb ?? '', r.fcp ?? '', r.lcp ?? '', r.tti ?? '',

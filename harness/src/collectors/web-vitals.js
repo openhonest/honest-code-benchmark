@@ -286,9 +286,8 @@ export async function afterRun(page, cdpSession) {
     const htmlFragmentCount = interactionXhr.length;
     const perInteractionFragmentBytes = interactionXhr.map(r => r.decodedBodySize || 0);
     const perInteractionServerMs = interactionXhr.map(r => {
-      const map = r.serverTiming?.map || 0;
-      const render = r.serverTiming?.render || 0;
-      return map + render;
+      if (!r.serverTiming || Object.keys(r.serverTiming).length === 0) return null;
+      return (r.serverTiming.map ?? 0) + (r.serverTiming.render ?? 0);
     });
 
     return {
