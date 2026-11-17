@@ -256,6 +256,7 @@ const CSV_COLUMNS = [
   'interactionCount', 'eventEntryCount', 'mutationCount',
   'bundleTransferSize', 'bundleParsedSize', 'wallClockMs',
   'reactRenderCount', 'htmlFragmentTotalBytes', 'htmlFragmentCount',
+  'perInteractionFragmentBytes', 'perInteractionServerMs',
   'perInteractionInp', 'perInteractionSettled',
   'sha256',
 ];
@@ -290,6 +291,9 @@ function csvRows(condition, runs) {
         r.bundleSize?.scripts?.reduce((s, x) => s + (x.decodedBodySize || 0), 0) || '',
         r.wallClockMs ?? '',
         r.reactRenderCount ?? '', r.htmlFragmentTotalBytes ?? '', r.htmlFragmentCount ?? '',
+        Array.isArray(r.perInteractionFragmentBytes) && r.perInteractionFragmentBytes.length > 0
+          ? r.perInteractionFragmentBytes.join(';') : '',
+        fmtArray(r.perInteractionServerMs),
         fmtArray(r.perInteractionInp),
         fmtArray(r.perInteractionSettled),
       ];
@@ -467,9 +471,31 @@ async function fullRun(opts) {
   const path = join(RESULTS_DIR, `full-${opts.seed}.csv`);
   const done = new Set();
   if (existsSync(path)) {
-    for (const line of readFileSync(path, 'utf8').split('\n').slice(1)) {
-      if (line) done.add(line.split(',')[0]);
+    const lines = readFileSync(path, 'utf8').split('\n');
+    const header = lines[0];
+    const counts = new Map();
+    const keepLines = [header];
+    for (const line of lines.slice(1)) {
+      if (!line) continue;
+      const cond = line.split(',')[0];
+      counts.set(cond, (counts.get(cond) || 0) + 1);
     }
+    for (const [cond, n] of counts) {
+      if (n >= opts.runs) done.add(cond);
+    }
+    // Keep only rows for completed conditions; strip partial ones so
+    // they get a clean re-run instead of being stuck forever.
+    for (const line of lines.slice(1)) {
+      if (!line) continue;
+      const cond = line.split(',')[0];
+      if (done.has(cond)) keepLines.push(line);
+    }
+    const incomplete = [...counts].filter(([, n]) => n < opts.runs);
+    if (incomplete.length > 0) {
+      const rows = incomplete.reduce((s, [, n]) => s + n, 0);
+      console.log(`Stripped ${rows} row(s) from ${incomplete.length} incomplete condition(s); they will re-run.`);
+    }
+    writeFileSync(path, keepLines.join('\n') + '\n');
   } else {
     writeFileSync(path, CSV_COLUMNS.join(',') + '\n');
   }
@@ -489,13 +515,22 @@ async function fullRun(opts) {
     }
     const runs = [];
     for (let r = 0; r < opts.runs; r++) {
-      try {
-        runs.push(await runOnce(browser, url, c.net, c.dev, webVitalsCollector, interact));
-      } catch (e) {
-        failed++;
-        console.log(`  run ${r + 1} failed: ${e.message.split('\n')[0]}`);
-        runs.push({ error: e.message });
+      let result = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          result = await runOnce(browser, url, c.net, c.dev, webVitalsCollector, interact);
+          break;
+        } catch (e) {
+          if (attempt < 2) {
+            console.log(`  run ${r + 1} attempt ${attempt + 1} failed: ${e.message.split('\n')[0]}, retrying...`);
+          } else {
+            failed++;
+            console.log(`  run ${r + 1} failed after 3 attempts: ${e.message.split('\n')[0]}`);
+            result = { error: e.message };
+          }
+        }
       }
+      runs.push(result);
     }
     appendFileSync(path, csvRows(c.name, runs));
   }

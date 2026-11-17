@@ -24,8 +24,17 @@ export default async function tableInteraction(page) {
   await page.fill('[data-role="filter-input"]', 'Smith');
   await settle(page, 400); // the filter is debounced in some arms
 
-  await clickIfEnabled(page, '[data-action="next-page"]');
+  // Paginate to page 3.  If the filtered view has fewer than 3 pages
+  // (100-row conditions with ~4 Smiths), clear the filter first so
+  // pagination operates on the full dataset.
+  const paged = await clickIfEnabled(page, '[data-action="next-page"]');
   await settle(page);
+  if (!paged) {
+    await page.fill('[data-role="filter-input"]', '');
+    await settle(page, 400);
+    await clickIfEnabled(page, '[data-action="next-page"]');
+    await settle(page);
+  }
   await clickIfEnabled(page, '[data-action="next-page"]');
   await settle(page);
 

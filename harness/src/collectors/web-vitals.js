@@ -95,11 +95,18 @@ export const initScript = `
   new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
       if (entry.initiatorType === 'xmlhttprequest' || entry.initiatorType === 'fetch') {
+        var st = {};
+        if (entry.serverTiming) {
+          for (var t of entry.serverTiming) {
+            st[t.name] = t.duration;
+          }
+        }
         window.__harness.xhrResponses.push({
           name: entry.name,
           transferSize: entry.transferSize,
           decodedBodySize: entry.decodedBodySize,
           startTime: entry.startTime,
+          serverTiming: st,
         });
       }
     }
@@ -277,6 +284,12 @@ export async function afterRun(page, cdpSession) {
     const interactionXhr = window.__harness.xhrResponses.filter(r => r.startTime > 2000);
     const htmlFragmentTotalBytes = interactionXhr.reduce((s, r) => s + (r.decodedBodySize || 0), 0);
     const htmlFragmentCount = interactionXhr.length;
+    const perInteractionFragmentBytes = interactionXhr.map(r => r.decodedBodySize || 0);
+    const perInteractionServerMs = interactionXhr.map(r => {
+      const map = r.serverTiming?.map || 0;
+      const render = r.serverTiming?.render || 0;
+      return map + render;
+    });
 
     return {
       ttfb, fcp: fcpTime, lcp: lcpTime, tti, tbt, inp, cls,
@@ -292,6 +305,8 @@ export async function afterRun(page, cdpSession) {
       reactRenderCount: window.__harness.reactRenderCount,
       htmlFragmentTotalBytes,
       htmlFragmentCount,
+      perInteractionFragmentBytes,
+      perInteractionServerMs,
       perInteractionInp,
     };
   });
