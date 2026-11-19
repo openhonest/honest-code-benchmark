@@ -271,7 +271,7 @@ This analysis was not preregistered. It addresses the design asymmetry noted in 
 | 12 FastAPI Honest | | | | | |
 | 13 htmx conventional | | | | | |
 
-This comparison does not answer whether htmx beats CSR when both sides fetch, because no CSR arm in this study fetches on interaction. That question requires a future study with CSR arms that call an API per interaction. What this comparison does show is [PLACEHOLDER — which server-paging architecture settles fastest, and by how much].
+This comparison does not answer whether htmx beats CSR when both sides fetch, because no CSR arm in this study fetches on interaction (see Section 5.2 and Appendix A, item 1). What this comparison does show is [PLACEHOLDER — which server-paging architecture settles fastest, and by how much].
 
 ### 4.18. Robustness
 
@@ -289,24 +289,24 @@ H6 was disconfirmed at every latency. The result is real, but the question was f
 
 The registration describes this asymmetry and treats it as inherent: "the data-access strategy is part of the rendering-mode variable, not a separate factor, because production server-rendered applications page from a database." That framing is defensible for the initial-load comparison (H9), where the SSR arms deliver rendered HTML and the CSR arms must parse a bundle. It is not defensible for the interaction comparison (H6), because production CSR applications also fetch data on interaction. A CRUD application that sorts, filters or paginates calls an API. The CSR arms in this study do not. They hold all data in memory and sort, filter and page locally, which is realistic only at small payload sizes.
 
-The fair test of H6 would compare interaction-to-settled for both sides, with both sides fetching per interaction. Section 4.17 reports a post-hoc exploratory comparison among the five arms that do page from SQLite (Arms 6, 10, 11, 12, 13). That comparison cannot answer whether htmx beats CSR when both fetch, because no CSR arm in this study fetches on interaction. A future study should add CSR arms that call an API per interaction, so that the round-trip cost is present on both sides.
+The fair test of H6 would compare interaction-to-settled for both sides, with both sides fetching per interaction. No CSR arm in this study fetches on interaction, so that test is not possible here. Section 4.17 reports a post-hoc exploratory comparison among the five arms that do page from SQLite (Arms 6, 10, 11, 12, 13), which answers a narrower question: among architectures that fetch per interaction, which settles fastest?
 
 What H6 does establish is narrower than intended: when a CSR application holds all state client-side and processes interactions locally, no server-rendered architecture in the measured range can match its interaction latency. That is a real finding about applications at small payload sizes, where holding all data in the browser is practical. It is not a finding about htmx at scale.
 
-The htmx arms still hold the smallest bundles (17.5 KB), eliminate client-side state synchronization as a category of defect, and simplify the development model. Those advantages are outside H6's scope but matter to any practitioner deciding between the two patterns.
+The htmx arms still hold the smallest bundles (17.5 KB) and simplify the development model. When coupled with DATAOS (as in Arms 6 and 11), htmx eliminates client-side state synchronization as a category of defect, because the DOM is the state and the server replaces it on each interaction. Without DATAOS, htmx alone does not eliminate that category: a developer who stores state in JavaScript alongside htmx swaps reintroduces the synchronization problem. These advantages are outside H6's scope but matter to any practitioner deciding between the two patterns.
 
 ### 5.3. Server code style matters, and can be measured
 
 [PLACEHOLDER — The H10 ablation isolates server code style with identical client bundles and HTML. The result that Honest Code holds flat while conventional patterns scale with payload size is a measurable effect of code architecture on runtime performance. Discuss what drives the difference: per-object allocation (domain classes) vs tree depth (providers and hierarchy).]
 
-### 5.4. The genX surprise
+### 5.4. The genX results
 
 [PLACEHOLDER — H13 predicted < 5ms genX overhead per interaction. Early data shows 0.1-0.7s ScriptDuration. This is the most unexpected result. Discuss whether the bootloader scan, the formatting pass, or the domx observation is the driver. This is an honest reporting of a result that goes against the author's prediction and interest.]
 
 ### 5.5. Limitations
 
-1. **Single implementer.** All 13 arms were written by the study author, who created three of the libraries under test. The bias instruments (Section 3.5) limit but do not eliminate this risk.
-2. **Single browser.** All measurements come from Chrome Headless Shell. Results may not generalise to Firefox, Safari or other engines.
+1. **Single implementer.** All 13 arms were written (with AI coding assistance) by the study author, who created three of the libraries under test. The bias instruments (Section 3.5) limit but do not eliminate this risk.
+2. **Single browser.** All measurements come from Chrome Headless Shell. Results may not generalize to Firefox, Safari or other engines.
 3. **Synthetic workload.** The five archetypes are CRUD-oriented. Applications dominated by cross-component coordination, optimistic updates with rollback, multi-user real-time consistency or heavy derived state present different tradeoffs.
 4. **Simulated network.** Network latency and device throttling are simulated via CDP, not measured on real networks or devices.
 5. **Power.** At 30 runs per condition with Holm-Bonferroni correction across the H1 family (100 tests), power is about 40% for a Cliff's delta of 0.45. Smaller effects may not reach significance.
@@ -318,7 +318,7 @@ Each hypothesis isolates one variable. A practitioner can read them independentl
 
 The optimal architecture assembled from the isolated winners is: server-side rendering with Honest Code patterns (H10: flat server time across payload sizes), DOM-as-state on the client via domx (H1: lowest INP; H2: lowest TTI; H3: smallest CSR bundle; H4: smallest mobile penalty), and htmx for server-rendered page updates (H8: smallest total bundle). This is Arm 6 with Arm 7's server patterns and Arm 10's transport, which no single arm in this study implements. Arm 11 comes closest: it uses Honest Code server patterns, htmx and domx together, but adds genX, which H13 shows costs [PLACEHOLDER]ms of ScriptDuration per interaction.
 
-The optimal without genX would be a Python or Node server writing Honest Code (pure functions, flat composition, typed dicts, dispatch tables), rendering HTML with htmx attributes, and using domx on the client to observe and persist DOM state. The server code stays flat as payloads grow (H10). The client bundle is small because htmx and domx together weigh under [PLACEHOLDER]KB. Interactions are fast because the DOM is the state and no reconciliation runs (H1). The mobile penalty is small because there is no JavaScript framework mediating state (H4).
+The optimal without genX would be a Node server writing Honest Code (pure functions, flat composition, typed dicts, dispatch tables), rendering HTML with htmx attributes, and using domx on the client to observe and persist DOM state. The H14 cross-runtime comparison (Section 4.16) and prior trace data (Wasserman, 2026) both show Node substantially faster than Python on the same server patterns. The trace data also show that Honest Code in TypeScript (pure functions, lookup tables, immutable returns) matches or beats compiled C++ class-based code on the same calculation at the nanosecond level (99ns vs 102ns), with zero state mutations against six. The performance advantage of functional patterns is not a property of the runtime; it appears across languages, and the compiled-language advantage disappears when the OOP code pays for object allocation, mutable field writes and global lookups that the functional code does not have. The server code stays flat as payloads grow (H10). The client bundle is small because htmx and domx together weigh under [PLACEHOLDER]KB. Interactions are fast because the DOM is the state and no reconciliation runs (H1). The mobile penalty is small because there is no JavaScript framework mediating state (H4).
 
 The registered 13 arms do not test that composite architecture directly. We added an exploratory Arm 14 after the registered run completed to measure it (see Appendix A, item 4, and Section [PLACEHOLDER]). The claim that the winners compose follows from the independence of the variables, which the factorial design supports: the state layer (Arms 1 through 5), the server code style (Arms 7 through 9) and the transport (CSR vs htmx) are varied independently and do not interact in the measurements collected. Arm 14 tests whether the composition holds in practice. A practitioner who cannot adopt the full composite can adopt any single winner in isolation and expect the measured effect to hold.
 
@@ -326,7 +326,7 @@ The registered 13 arms do not test that composite architecture directly. We adde
 
 Three directions follow from these results.
 
-First, the H10 ablation shows that server response time in the Honest Code arm holds flat across five orders of magnitude in payload size, while the conventional arm's response time rises. This study measures the effect but does not identify the mechanism. The three candidates are per-object allocation cost (domain classes instantiating one object per row, scaling linearly with data size), call-graph depth (providers and component hierarchy walking a deeper tree per render), and garbage-collection pressure (short-lived objects forcing more GC pauses at scale). Arm 8 sits between Arms 7 and 9, which implicates domain classes as part of the cost but not all of it. A follow-up study that instruments V8's memory allocator, GC event log, and call-graph depth across the three ablation arms at the 50,000 and 100,000 row sizes would isolate the mechanism. That study carries a smaller conflict of interest than this one, because it measures runtime internals rather than the author's libraries.
+First, the H10 ablation shows that server response time in the Honest Code arm holds flat across five orders of magnitude in payload size, while the conventional arm's response time rises. This study measures the effect but does not identify the mechanism. Three candidates are per-object allocation cost (domain classes instantiating one object per row, scaling linearly with data size), call-graph depth (providers and component hierarchy walking a deeper tree per render), and garbage-collection pressure (short-lived objects forcing more GC pauses at scale). Arm 8 sits between Arms 7 and 9, which implicates domain classes as part of the cost but not all of it. A follow-up study that instruments V8's memory allocator, GC event log, and call-graph depth across the three ablation arms at the 50,000 and 100,000 row sizes would isolate the mechanism. That study carries a smaller conflict of interest than this one, because it measures runtime internals rather than the author's libraries.
 
 Second, genX added 0.1 to 0.7 seconds of ScriptDuration per interaction (H13), well above the predicted 5ms. The bootloader scan, the formatting pass, and the domx observation loop are all candidates. Profiling the genX pipeline at the function level would identify where the time goes and whether it can be reduced.
 
@@ -349,6 +349,10 @@ Boris Petrov (github.com/borispetrovdev) reviewed the baseline (Arm 1), conventi
 ## Conflict of interest
 
 The author created and maintains the stateless, domx and genX libraries, has a commercial interest in the DATAOS architecture through the multicardz product, and wrote the Honest Code discipline whose principles govern Arms 6, 7, 11 and 12. This conflict applies to three of the four independent variables. The instruments for managing it are described in Section 3.5.
+
+## AI use disclosure
+
+This paper used AI tools in three roles. First, Claude Code (Anthropic) assisted with implementing several of the 13 experimental arms, as recorded in the implementation time log (Appendix B). Second, Grok (xAI) performed the initial specification-fidelity review (v1, Oct 29, 2026); Boris Petrov's subsequent review (v2/v3) was AI-assisted with Claude Code, as stated in his report. Third, Claude Code assisted with drafting sections of this manuscript and with writing the preliminary analysis scripts. The author reviewed, edited and takes responsibility for all code, all analysis and all text. No AI tool is listed as an author. No AI tool generated, altered or fabricated any experimental data.
 
 ## Data availability statement
 
@@ -379,6 +383,8 @@ Zhang, L., Sinclair, M.D. and Rogers, T.G. (2018). Characterizing the runtime ef
 Bogert, E., Schecter, A. and Watson, R.T. (2021). Preregistration in information systems research. MIS Quarterly, 45(3), 1221-1240.
 
 Van Miltenburg, E., van der Lee, C. and Krahmer, E. (2021). Preregistering NLP research. NAACL 2021, 613-623.
+
+Wasserman, A.Z. (2026). Honest Code traces: server response time by runtime and code style. https://github.com/adamzwasserman/honest-code-traces
 
 Winter, E., Bowes, D., Counsell, S., Hall, T., Sherwood-Smith, T. and Sherwood-Smith, N. (2023). Registered reports in software engineering. Empirical Software Engineering, 28(6), 141.
 
